@@ -1,0 +1,53 @@
+schema: spec-driven
+
+# Project context — shown to AI when creating artifacts.
+# Full detail lives in PRD.md, backend-planning-doc.md, frontend-planning-doc.md.
+context: |
+  Domain: Filaments v2, a single-user private notes store. Claude (via dictation)
+  turns speech into a note (title, Markdown body, tags) and saves it via a
+  remote MCP server. The backend only stores and searches; Claude does all AI work.
+  Capture uses dictation today; design MCP tools as if voice mode will call them
+  later (results and errors short and plain enough to be read aloud).
+
+  Tech stack:
+  - Python only. Django 5.2 LTS + Django Ninja; PostgreSQL full-text search
+  - MCP server: official MCP Python SDK (FastMCP), Streamable HTTP (stdio for local dev)
+  - Auth: django-oauth-toolkit (Claude -> MCP), service bearer token (MCP -> API),
+    Django session login (web UI)
+  - Web UI (Phase 2): Django templates + HTMX + Tailwind standalone CLI, no Node
+  - Docker Compose (web, db, mcp, cloudflared) on a home laptop behind Cloudflare Tunnel
+  - Tests: pytest-django
+
+  Architecture rules:
+  - Request/response Pydantic schemas live in one shared `schemas` package,
+    imported by both Ninja endpoints and MCP tools. Never duplicate them.
+  - The MCP server is a thin HTTP client over the API; it never touches the DB or ORM.
+  - MCP tools map one-to-one onto /api/ routes. The API is never exposed via the tunnel.
+
+  Domain rules:
+  - Filament: UUID id, title, body (Markdown), tags (M2M), source ("claude" | "web"),
+    search_vector (title weight A, body weight B, GIN), created_at, updated_at, deleted_at.
+  - Tags: unique, normalized server-side (trim, lowercase, spaces -> hyphens), max 8 per filament.
+  - Soft delete via deleted_at; nightly command purges rows deleted > 30 days ago.
+  - Filament + tag writes happen in one transaction.
+  - Errors: {"detail": ...}; 422s carry field-level detail so Claude can retry.
+
+  Out of scope — do not propose: embeddings/pgvector, auto-linking notes,
+  server-side LLM calls, transcription, Celery, Redis, S3, multi-user/sharing,
+  frontend JS frameworks, rich-text editing, native iOS app.
+
+# Per-artifact rules — applied only when generating that artifact.
+rules:
+  proposal:
+    - State which phase the change belongs to (Phase 1 voice capture, Phase 2 web UI, or Future) per PRD.md
+    - If the change touches an item under "Deferred Decisions" in a planning doc, list it as an open question instead of deciding it
+    - Flag any conflict with PRD.md or the planning docs explicitly rather than working around it
+  design:
+    - Say where each new request/response shape lives in the shared `schemas` package
+    - For MCP tool changes, name the API route the tool calls and how its errors are turned into readable tool messages
+  specs:
+    - Write scenarios from the caller's view (Claude via MCP, or the web UI user), including validation failures such as the 8-tag limit
+  tasks:
+    - Include a pytest-django test task for every API endpoint or search filter touched
+    - Put schema changes before the endpoint and MCP tool tasks that depend on them
+    - Add a task to update `.env.example` whenever a new env var is introduced
