@@ -109,7 +109,7 @@ Steps 8 and 10 don't depend on the API chain, so they can be done earlier or alo
 **Goal:** The OAuth flow claude.ai custom connectors expect.
 - django-oauth-toolkit with whatever Claude needs (check: dynamic client registration, PKCE, metadata endpoints, token lifetimes)
 - Login with your Django account during connector setup
-- **Deferred decisions to settle here:** the exact OAuth details, and whether the MCP server checks tokens by introspection or by reading the token table
+- **Deferred decisions to settle here:** the exact OAuth details, and whether the MCP server checks tokens by introspection against Django or as self-contained JWTs (never by reading the database)
 
 **Done when:** You can complete the OAuth flow by hand (or with a test client) and receive a token the MCP server would accept.
 **Resolves:** PRD risk #2.

@@ -100,7 +100,7 @@ REST with Django Ninja, all routes under `/api/`, no version prefix (single clie
 
 ## Deferred Decisions
 - Exact OAuth details Claude's custom connectors require (e.g. dynamic client registration, PKCE, token lifetimes)
-- Whether the MCP server validates OAuth tokens by introspection against Django or by reading the token table directly
+- How the MCP server validates OAuth tokens: introspection against Django (RFC 7662) or self-contained JWTs it verifies itself. It never reads the token table, because the MCP server does not touch the database
 - How `search_vector` stays current: a Django `GeneratedField` or an update on save
 - Backup destination and restore test
 - Domain name for the Cloudflare Tunnel hostname
