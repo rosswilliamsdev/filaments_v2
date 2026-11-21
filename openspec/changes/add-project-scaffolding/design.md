@@ -75,7 +75,8 @@ Supported by Django 5.2 and current wheels for psycopg and pydantic. Pinned in `
 | `DJANGO_DEBUG` | `true` | `false` |
 | `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` | adds `web` and, in step 9, the tunnel hostname |
 | `DJANGO_CSRF_TRUSTED_ORIGINS` | empty | set in step 9 |
-| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT` | `POSTGRES_HOST=localhost` | `POSTGRES_HOST=db` |
+| `DJANGO_LOG_FILE` | empty (console only) | set by Compose to `/app/logs/django.log` |
+| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT` | `POSTGRES_HOST=localhost`, `POSTGRES_PORT` = a free host port (5433 on this Mac) | Compose overrides to `POSTGRES_HOST=db`, `POSTGRES_PORT=5432` |
 
 Settings fail fast if `DJANGO_SECRET_KEY` is missing. `USE_TZ = True` and `TIME_ZONE = "UTC"`: timestamps are stored in UTC. The question of which timezone date filters use belongs to step 5.
 
@@ -83,7 +84,7 @@ Settings fail fast if `DJANGO_SECRET_KEY` is missing. `USE_TZ = True` and `TIME_
 
 ### 4. Compose: `web` runs gunicorn, development runs `runserver`
 
-- `db`: `postgres:17`, named volume, `pg_isready` healthcheck, port published on `127.0.0.1:5432` only, so tests and `runserver` on the Mac can reach it.
+- `db`: `postgres:17`, named volume, `pg_isready` healthcheck, published on `127.0.0.1` only, so tests and `runserver` on the Mac can reach it. The host port follows `POSTGRES_PORT` from `.env` (default 5432). The Mac already runs a local Postgres on 5432, so its `.env` uses 5433. Inside Compose, `web` always connects to `db:5432`.
 - `web`: built from `backend/Dockerfile`. It runs `migrate`, then `gunicorn config.wsgi`, waits for `db` to be healthy, and publishes `127.0.0.1:8000` only. The API is never exposed beyond localhost and the Docker network.
 - Day-to-day development: `docker compose up db` plus `uv run backend/manage.py runserver` on the Mac for autoreload.
 
@@ -91,13 +92,13 @@ Settings fail fast if `DJANGO_SECRET_KEY` is missing. `USE_TZ = True` and `TIME_
 
 ### 5. Health route checks the database
 
-`GET /api/health` runs `SELECT 1`. It returns `200 {"status": "ok"}` when that succeeds and `503 {"detail": "Database unavailable"}` when it fails. It is unauthenticated (the one public API route per `backend-planning-doc.md`) and registered on the project's single `NinjaAPI` instance at `/api/`. Ninja's docs stay at `/api/docs`. That's acceptable because `/api/` is never routed through the tunnel.
+`GET /api/health` runs `SELECT 1`. It returns `200 {"status": "ok"}` when that succeeds and `503 {"detail": "Database unavailable"}` when it fails. It is unauthenticated (the one public API route per `backend-planning-doc.md`) and registered on the project's single `NinjaAPI` instance at `/api/`. Both response shapes (`HealthStatus` and `ErrorDetail`, the `{"detail": ...}` error body) live in `schemas/src/schemas/common.py`, following the rule that every request and response shape is shared. The route returns `ninja.Status(...)` objects, because django-ninja 1.8 deprecates `(status, body)` tuples. Ninja's docs stay at `/api/docs`. That's acceptable because `/api/` is never routed through the tunnel.
 
 **Why check the database:** a 200 from a process that can't reach Postgres would hide the most likely failure on the laptop. The Compose healthcheck for `web` can use the same route.
 
 ### 6. Tests run on the Mac against the Compose database
 
-pytest-django runs against PostgreSQL, not SQLite, because full-text search (step 5) is Postgres-only. Config lives in the root `pyproject.toml` (`DJANGO_SETTINGS_MODULE = "config.settings"`, `pythonpath = ["backend"]`). Command: `uv run pytest`.
+pytest-django runs against PostgreSQL, not SQLite, because full-text search (step 5) is Postgres-only. Config lives in the root `pyproject.toml` (`DJANGO_SETTINGS_MODULE = "config.settings"`, `pythonpath = ["backend"]`). Command: `uv run --env-file .env pytest`. Commands run on the host load `.env` through uv's `--env-file`, so no extra dependency like python-dotenv is needed.
 
 ### 7. Ruff for lint and format
 

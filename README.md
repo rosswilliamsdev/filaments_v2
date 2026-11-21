@@ -4,7 +4,7 @@ A private notes repository you fill by talking to Claude.
 
 Dictate a thought to Claude in the Claude app. Claude cleans it up, writes a title, picks tags, and saves it through a self-hosted MCP server. Later, ask Claude to find past notes, or browse and edit them in a private web UI.
 
-> **Status:** Planning. No application code yet — see the planning docs below.
+> **Status:** Phase 1 in progress. Scaffolding is done (Django + Postgres in Docker Compose, `GET /api/health`); see [`roadmap.md`](roadmap.md) for what's next.
 
 ## How it works
 
@@ -58,11 +58,16 @@ Claude does the thinking (transcription, cleanup, titling, tagging). The backend
 
 ## Getting started
 
-Setup instructions will be added once the first code lands. The planned setup is:
+Requires [uv](https://docs.astral.sh/uv/) and Docker.
 
-1. Copy `.env.example` to `.env` and fill in the secrets
-2. `docker compose up` (services: `web`, `db`, `mcp`, `cloudflared`)
-3. Add the MCP server's public URL as a custom connector in claude.ai
+1. Copy `.env.example` to `.env`. Set `DJANGO_SECRET_KEY` and `POSTGRES_PASSWORD`.
+2. `uv sync`
+3. `docker compose up -d --build` (services so far: `web`, `db`)
+4. `curl http://127.0.0.1:8000/api/health` should return `{"status": "ok"}`
+
+Tests: `uv run --env-file .env pytest` (with the `db` container running). More commands are in [`CLAUDE.md`](CLAUDE.md).
+
+Later steps add the `mcp` and `cloudflared` services; then you add the MCP server's public URL as a custom connector in claude.ai.
 
 ## License
 

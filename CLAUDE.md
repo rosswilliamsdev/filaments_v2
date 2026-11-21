@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## Project status
 
-**Pre-code.** The repo holds planning docs only. No application code, dependencies, or build commands exist yet. Don't assume a directory layout, run commands, or reference modules that haven't been created — check first.
+Roadmap step 1 (scaffolding) is in place: a Django project with `GET /api/health`, running in Docker Compose. Models, the real API, the MCP server and OAuth come in later steps — check `roadmap.md` before assuming a module exists.
 
 Source of truth, in priority order:
 1. `PRD.md` — scope, goals, non-goals, phasing
@@ -13,6 +13,37 @@ Source of truth, in priority order:
 4. `openspec/` — change proposals and specs (spec-driven workflow)
 
 `roadmap.md` sets the build order. Each numbered step is meant to be one OpenSpec change; check it to see what comes next and what a step depends on.
+
+## Layout
+
+A uv workspace with one lockfile (`uv.lock`). Python 3.13.
+
+```
+pyproject.toml     # workspace root: dev deps, Ruff and pytest config
+backend/           # filaments-backend: Django project (config/), Ninja API (api/), tests/
+schemas/           # filaments-schemas: shared Pydantic models, import name `schemas`. No Django imports.
+compose.yaml       # web (gunicorn) + db (postgres:17); both bound to 127.0.0.1 only
+```
+
+The MCP server will be added as `mcp_server/` (import `filaments_mcp`). Never name a local package `mcp` — it shadows the MCP SDK.
+
+## Commands
+
+Run from the repo root. Settings come from `.env` (copy `.env.example`; `DJANGO_SECRET_KEY` is required). Commands on the host need `--env-file .env`.
+
+```bash
+uv sync                                          # install everything (workspace + dev tools)
+docker compose up -d --build                     # run web + db; API at http://127.0.0.1:8000/api/health
+docker compose up -d db                          # db only, for local dev and tests
+uv run --env-file .env backend/manage.py runserver   # dev server with autoreload (needs db up)
+uv run --env-file .env backend/manage.py migrate
+uv run --env-file .env pytest                    # tests run against the Compose Postgres (needs db up)
+uv run ruff check . && uv run ruff format .      # lint + format
+```
+
+Logs: console always; in Compose also `logs/django.log` (gitignored).
+
+If another Postgres already holds port 5432 on the host, set `POSTGRES_PORT` in `.env` to a free port (e.g. 5433); Compose publishes the db on that port and `web` still uses 5432 internally.
 
 If a request conflicts with these docs, point out the conflict before writing code. Each planning doc has a **Deferred Decisions** section — don't silently decide those; raise them.
 
@@ -65,4 +96,4 @@ Secrets live in `.env` (gitignored). Any new key must also be added to `.env.exa
 
 - This repo uses **OpenSpec** (`openspec/`, `/opsx:*` commands). For non-trivial features, propose a change (`/opsx:propose`) before implementing, then `/opsx:apply`.
 - Prioritize tests for the API endpoints and search filters — those are what Claude relies on.
-- When code is added, update this file with real commands (setup, run, test, lint) and remove the "Pre-code" note.
+- Keep the Commands section above current when a step adds a service, env var or command.
