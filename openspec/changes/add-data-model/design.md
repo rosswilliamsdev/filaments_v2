@@ -37,7 +37,7 @@ Step 1 left a Django 5.2 project (`backend/config`, `backend/api`) on Postgres 1
 ```python
 search_vector = GeneratedField(
     expression=SearchVector("title", weight="A", config="english")
-             + SearchVector("body",  weight="B", config="english"),
+    + SearchVector("body", weight="B", config="english"),
     output_field=SearchVectorField(),
     db_persist=True,
 )
@@ -86,8 +86,9 @@ class ActiveFilamentManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().filter(deleted_at__isnull=True)
 
+
 class Filament(models.Model):
-    objects = ActiveFilamentManager()   # declared first → default manager
+    objects = ActiveFilamentManager()  # declared first → default manager
     all_objects = models.Manager()
 ```
 

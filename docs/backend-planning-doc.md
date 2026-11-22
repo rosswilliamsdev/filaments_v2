@@ -25,7 +25,7 @@ A private notes repository filled by dictating to Claude in the Claude app. Clau
   - `title` — text
   - `body` — Markdown text
   - `source` — `"claude"` or `"web"`
-  - `search_vector` — tsvector over title (weight A) and body (weight B), with a GIN index
+  - `search_vector` — tsvector over title (weight A) and body (weight B), `english` text-search config, with a GIN index. A Postgres generated column (Django `GeneratedField`), so it stays current on every write, including bulk updates. Tags are not part of it
   - `created_at`, `updated_at`
   - `deleted_at` — nullable; set on soft delete
 - **Tag**
@@ -83,7 +83,7 @@ REST with Django Ninja, all routes under `/api/`, no version prefix (single clie
 - **Load:** one user, low volume.
 - **Caching:** none.
 - **Files and uploads:** none in scope (attachments are an open question in the PRD).
-- **Search:** Postgres full-text search on `search_vector` (title weighted above body), filtered by tags and date range, ordered by rank when `q` is present and by `created_at` otherwise.
+- **Search:** Postgres full-text search on `search_vector` (title weighted above body, `english` config), filtered by tags and date range, ordered by rank when `q` is present and by `created_at` otherwise. Keyword search (`q`) also matches tag names, so a note tagged `music` is found by "music" even if its text never says it. Queries must use the same `english` config as the column.
 
 ## Config & Environment
 - **Secrets:** a `.env` file on the laptop, read by Django and the MCP server, excluded from Git. A committed `.env.example` lists the required keys.
@@ -101,7 +101,6 @@ REST with Django Ninja, all routes under `/api/`, no version prefix (single clie
 ## Deferred Decisions
 - Exact OAuth details Claude's custom connectors require (e.g. dynamic client registration, PKCE, token lifetimes)
 - How the MCP server validates OAuth tokens: introspection against Django (RFC 7662) or self-contained JWTs it verifies itself. It never reads the token table, because the MCP server does not touch the database
-- How `search_vector` stays current: a Django `GeneratedField` or an update on save
 - Backup destination and restore test
 - Domain name for the Cloudflare Tunnel hostname
 - Whether `list_filaments` and `search_filaments` stay separate tools or merge into one

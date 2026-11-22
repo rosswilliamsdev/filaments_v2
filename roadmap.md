@@ -60,7 +60,7 @@ Steps 8 and 10 don't depend on the API chain, so they can be done earlier or alo
 - `Filament` (UUID, title, body, source, timestamps, `deleted_at`) and `Tag` (unique name), M2M
 - `search_vector` with a GIN index (title weight A, body weight B)
 - Default manager that hides soft-deleted rows
-- **Deferred decision to settle here:** `GeneratedField` vs. updating `search_vector` on save
+- **Settled:** `search_vector` is a `GeneratedField` (`english` config); tags stay out of it and are matched in step 5
 
 **Done when:** Migrations apply, and model tests cover the soft-delete manager and the search vector updating.
 
@@ -84,6 +84,7 @@ Steps 8 and 10 don't depend on the API chain, so they can be done earlier or alo
 **Goal:** The retrieval Claude depends on.
 - `GET /api/filaments` with `q`, `tags` (all must match), `date_from`, `date_to`, `limit`, `offset`
 - Ordered by rank when `q` is set, otherwise newest first
+- `q` matches the search vector **or** tag names (agreed in step 2; tags aren't in the generated vector), using the `english` config
 - `GET /api/tags` with usage counts (excluding soft-deleted filaments)
 
 **Done when:** Tests cover each filter alone and combined, ranking order, and paging.

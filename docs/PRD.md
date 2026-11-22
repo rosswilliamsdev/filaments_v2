@@ -40,7 +40,7 @@ Filaments v1 planned a custom iOS app and an in-house AI pipeline. In v2, Claude
 ### In Scope
 - **Capture via Claude:** Claude cleans up the spoken text, writes a title, picks tags (reusing existing ones via `list_tags`), and calls `create_filament`
 - **Tags:** lowercase, hyphenated, ≤8 per filament
-- **Search:** Postgres full-text search on title and body, filterable by tags and date range
+- **Search:** Postgres full-text search on title and body (English stemming), where keywords also match tag names; filterable by tags and date range
 - **MCP tools:**
   - `create_filament(title, body, tags)`
   - `search_filaments(query?, tags?, date_from?, date_to?, limit?)`
@@ -108,7 +108,7 @@ You ──dictate──> Claude app chat (phone)
 See `backend-planning-doc.md` for the full backend design.
 
 **Data model:**
-- `Filament`: id (UUID), title, body (Markdown), tags (M2M → Tag), source (`"claude"`, `"web"`), search_vector, created_at, updated_at, deleted_at (soft-delete tombstone)
+- `Filament`: id (UUID), title, body (Markdown), tags (M2M → Tag), source (`"claude"`, `"web"`), search_vector (generated column, `english` config), created_at, updated_at, deleted_at (soft-delete tombstone)
 - `Tag`: id, name (unique, lowercase, hyphenated)
 
 **Dropped from v1:** React Native/Expo app, Whisper transcription, server-side Claude extraction (summary, key ideas, action items), embeddings and pgvector, auto-linking and `FilamentLink`, Celery + Redis, S3, the `/process` endpoint and `pipeline_attempts` recovery, Sign in with Google.
