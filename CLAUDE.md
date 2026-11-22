@@ -47,7 +47,7 @@ If another Postgres already holds port 5432 on the host, set `POSTGRES_PORT` in 
 
 `FILAMENTS_TIMEZONE` (IANA name, e.g. `America/Chicago`; default `UTC`) sets Django's `TIME_ZONE`. Timestamps are stored in UTC; the home zone decides what a calendar day means for date filters. An unknown name stops startup.
 
-`FILAMENTS_API_TOKEN` (required, 32+ characters) is the bearer token for every API route except `/api/health`; generate it with `uv run python -c "import secrets; print(secrets.token_urlsafe(32))"`. Tests use a fixed token from `backend/tests/conftest.py`, whose `client` fixture sends it (`anon_client` doesn't).
+`FILAMENTS_API_TOKEN` (required, 32+ characters) is the bearer token for every API route except `/api/health`; generate it with `uv run python -c "import secrets; print(secrets.token_urlsafe(32))"`. `/api/docs` and `/api/openapi.json` exist only when `DJANGO_DEBUG` is on. Tests use a fixed token from `backend/tests/conftest.py`, whose `client` fixture sends it (`anon_client` doesn't).
 
 `pytest` runs `backend/tests` (needs the db) and `schemas/tests` (no database).
 
@@ -101,5 +101,6 @@ Secrets live in `.env` (gitignored). Any new key must also be added to `.env.exa
 ## Workflow
 
 - This repo uses **OpenSpec** (`openspec/`, `/opsx:*` commands). For non-trivial features, propose a change (`/opsx:propose`) before implementing, then `/opsx:apply`.
+- **After finishing `/opsx:apply`, run one round of `/code-review`** on the change. Verify each finding (reproduce it where possible), implement the fixes for the real ones with tests, and update the change's spec/design if a fix changes behavior. Report findings that turned out to be false alarms rather than silently dropping them. One round only — don't re-review the fixes unless asked. Then wait for "commit and push" before archiving.
 - Prioritize tests for the API endpoints and search filters — those are what Claude relies on.
 - Keep the Commands section above current when a step adds a service, env var or command.

@@ -37,6 +37,7 @@ def test_every_route_rejects_a_missing_token(anon_client, method, path, body):
 
     assert response.status_code == 401
     assert response.json() == UNAUTHORIZED
+    assert response["WWW-Authenticate"] == "Bearer"
 
 
 def test_rejected_create_stores_nothing(anon_client):
@@ -65,6 +66,19 @@ def test_non_ascii_token_is_a_401_not_a_500(anon_client):
     assert response.status_code == 401
 
 
+@pytest.mark.parametrize(
+    "authorization",
+    ["Bearer  {token}", "Bearer {token} ", "bearer {token}"],
+    ids=["double-space", "trailing-space", "lowercase-scheme"],
+)
+def test_correct_token_with_loose_formatting_is_accepted(anon_client, api_token, authorization):
+    header = authorization.format(token=api_token)
+
+    response = anon_client.get("/api/filaments", headers={"Authorization": header})
+
+    assert response.status_code == 200
+
+
 def test_correct_token_is_accepted(client):
     assert client.get("/api/filaments").status_code == 200
     assert call(client, "post", "/api/filaments", BODY).status_code == 201
@@ -72,6 +86,30 @@ def test_correct_token_is_accepted(client):
 
 def test_health_needs_no_token(anon_client):
     assert anon_client.get("/api/health").status_code == 200
+
+
+@pytest.mark.parametrize(
+    "authorization",
+    ["{token}", "Token {token}", "Bearer:{token}"],
+    ids=["no-scheme", "token-scheme", "colon"],
+)
+def test_token_never_logged_with_debug_on(anon_client, api_token, caplog, settings, authorization):
+    settings.DEBUG = True  # Ninja's own HttpBearer logs the first header word in DEBUG
+
+    with caplog.at_level(logging.DEBUG):
+        response = anon_client.get(
+            "/api/filaments", headers={"Authorization": authorization.format(token=api_token)}
+        )
+
+    assert response.status_code == 401
+    assert api_token not in caplog.text
+
+
+@pytest.mark.parametrize("path", ["/api/docs", "/api/openapi.json"])
+def test_docs_are_off_when_debug_is_off(anon_client, client, path):
+    # Tests run with DEBUG off, like the laptop deployment.
+    assert anon_client.get(path).status_code == 404
+    assert client.get(path).status_code == 404
 
 
 def test_rejection_is_logged_without_tokens(anon_client, api_token, caplog):

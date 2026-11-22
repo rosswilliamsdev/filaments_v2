@@ -63,7 +63,8 @@ Existing tests keep using `client` unchanged. **Alternative:** add the header in
 - [Token in `.env` on the laptop] → Same trust boundary as `DJANGO_SECRET_KEY` and the DB password; `.env` is gitignored.
 - [Forgetting to set the token in a new environment] → Startup fails loudly with the key name, and the Compose healthcheck shows `web` unhealthy.
 - [Overriding pytest-django's `client` fixture surprises a reader] → The conftest docstring says so; `anon_client` makes unauthenticated tests explicit.
-- [`/api/docs` reachable without a token] → Localhost only and read-only schema; it can't call routes without the token.
+- [Ninja serves `/api/docs` and `/api/openapi.json` without auth] → Served only when `DEBUG` is on (found in code review); the laptop deployment returns 404 for both.
+- [Ninja's `HttpBearer.__call__` logs the first header word when `DEBUG` is on, which is the token if a caller omits the scheme] → `ServiceToken` overrides `__call__` and parses the header itself with `split(None, 1)` (which also tolerates extra whitespace); nothing from the header is logged. Found in code review; a test with `DEBUG=True` covers it.
 
 ## Migration Plan
 
