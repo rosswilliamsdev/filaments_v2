@@ -50,7 +50,7 @@ Never named `mcp` (would shadow the SDK), per CLAUDE.md.
 
 ### Validation inside the tools, one error formatter
 
-Tool parameters use plain types with `Annotated[..., Field(description=...)]` so the published schema is flat and descriptive. Each tool builds the shared model (`FilamentCreate`, `FilamentUpdate`, `FilamentListParams`) and catches `ValidationError`. Pydantic errors and the API's 422 body share the `{loc, msg}` shape, so `formatting.validation_message(errors)` turns either into "tags: Tag limit is 8; got 9" (last `loc` segment that isn't `body`/`query`/`data`; model-level errors without a field are just the message). **Alternative:** annotate parameters with the shared `Annotated` types so the framework validates first. Rejected: its error text ("1 validation error for …Arguments") isn't speakable and we can't reword it.
+Tool parameters use plain types with `Annotated[..., Field(description=...)]` so the published schema is flat and descriptive. Descriptions are read from the shared models' fields (`_describe()`), so wording can't drift; bounds and defaults stay in the models and are enforced inside the tool (the tool's `limit` default of 10 is the one deliberate difference). Each tool builds the shared model (`FilamentCreate`, `FilamentUpdate`, `FilamentListParams`) and catches `ValidationError`. Pydantic errors and the API's 422 body share the `{loc, msg}` shape, so `formatting.validation_message(errors)` turns either into "tags: Tag limit is 8; got 9" (last `loc` segment that isn't `body`/`query`/`data`; model-level errors without a field are just the message). **Alternative:** annotate parameters with the shared `Annotated` types so the framework validates first. Rejected: its error text ("1 validation error for …Arguments") isn't speakable and we can't reword it.
 
 `update_filament` passes only non-`None` arguments into `FilamentUpdate`, so omitted fields stay omitted and an all-`None` call hits the "Send at least one of title, body or tags" rule.
 
@@ -61,10 +61,12 @@ One `httpx.AsyncClient(base_url=FILAMENTS_API_URL, headers={"Authorization": f"B
 | API outcome | Message |
 |---|---|
 | 422 | `validation_message(detail)` |
-| 404 | "No note with that id." |
+| 404 with the API's `"No filament with that id"` detail | "No note with that id." |
+| any other 404 (e.g. URL missing `/api`) | "The notes server address looks wrong. Check FILAMENTS_API_URL." (logged) |
+| non-JSON 2xx | the 5xx message (logged) |
 | 401 | "The notes server rejected my credentials. Check FILAMENTS_API_TOKEN." |
 | 5xx | "The notes server hit an error. It has been logged." |
-| `httpx.ConnectError` / `TimeoutException` | "I can't reach the notes server right now." |
+| any `httpx.TransportError` (refused, timeout, dropped/reset, bad scheme) | "I can't reach the notes server right now." |
 
 `mask_error_details=True` hides anything else from the client; FastMCP logs the traceback to stderr.
 
@@ -83,7 +85,7 @@ The tool `limit` default is 10 (the API's is 20): enough for a spoken answer and
 
 ### Server instructions and annotations
 
-`instructions` tell Claude: check `list_tags` and reuse existing tags; at most 8 tags; dates are the user's local days as YYYY-MM-DD; delete only when asked; never read bracketed ids aloud. Annotations: `readOnlyHint` on search/get/list_tags, `destructiveHint` on delete, `idempotentHint` on update.
+`instructions` tell Claude: check `list_tags` and reuse existing tags; at most 8 tags; dates are the user's local days as YYYY-MM-DD; delete only when asked; never read bracketed ids aloud. Annotations: `readOnlyHint` on search/get/list_tags. MCP's `destructiveHint` defaults to true for non-read-only tools, so every writing tool sets it: `false` on create (a capture must never need confirmation), `true` on update (it overwrites text with no history) and delete; `idempotentHint` on update. (Found in code review.)
 
 ### Stdio hygiene
 

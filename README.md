@@ -22,7 +22,7 @@ Claude does the thinking (transcription, cleanup, titling, tagging). The backend
 ## Features
 
 **Phase 1 — Voice capture (MVP)**
-- MCP tools: `create_filament`, `search_filaments`, `get_filament`, `list_filaments`, `update_filament`, `delete_filament`, `list_tags`
+- MCP tools: `create_filament`, `search_filaments`, `get_filament`, `update_filament`, `delete_filament`, `list_tags`
 - Postgres full-text search over title and body, filterable by tags and date range
 - Tags normalized to lowercase-hyphenated, up to 8 per note; `list_tags` helps Claude reuse existing tags
 - Soft delete with a 30-day purge
@@ -42,7 +42,7 @@ Claude does the thinking (transcription, cleanup, titling, tagging). The backend
 |------------|------------|
 | Backend    | Django 5.2 LTS, Django Ninja |
 | Database   | PostgreSQL (built-in full-text search) |
-| MCP server | Python MCP SDK (FastMCP), Streamable HTTP |
+| MCP server | FastMCP 4 (built on the official MCP SDK), Streamable HTTP |
 | Auth       | django-oauth-toolkit, service bearer token, Django sessions |
 | Frontend   | Django templates, HTMX, Tailwind CSS (standalone CLI) |
 | Hosting    | Home laptop (Ubuntu Server), Docker Compose, Cloudflare Tunnel |

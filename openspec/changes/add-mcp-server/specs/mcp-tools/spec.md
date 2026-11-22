@@ -5,7 +5,7 @@ The MCP server SHALL expose exactly these tools, each calling one API route with
 
 #### Scenario: Tool list
 - **WHEN** a client lists the server's tools
-- **THEN** it sees exactly the six tools above, with `search_filaments`, `get_filament` and `list_tags` marked read-only and `delete_filament` marked destructive
+- **THEN** it sees exactly the six tools above, with `search_filaments`, `get_filament` and `list_tags` marked read-only, `create_filament` marked explicitly non-destructive (so saving never needs confirmation), and `update_filament` and `delete_filament` marked destructive
 
 #### Scenario: Token sent
 - **WHEN** any tool calls the API
@@ -27,7 +27,7 @@ The MCP server SHALL expose exactly these tools, each calling one API route with
 - **THEN** the tool fails with "tags: Tag limit is 8; got 9" and no API request is sent
 
 ### Requirement: Finding notes
-`search_filaments` SHALL accept optional `query`, `tags`, `date_from`, `date_to` (YYYY-MM-DD, the user's local days), `limit` (default 10) and `offset`, validate them with `FilamentListParams`, and list matches with one line per note: number, quoted title, local date and time (e.g. "Tue Nov 24, 11:30 PM"), tags, a body excerpt of about 200 characters, and the id in brackets. The reply SHALL start with how many notes were found and end with "Showing X of Y." when more exist.
+`search_filaments` SHALL accept optional `query`, `tags`, `date_from`, `date_to` (YYYY-MM-DD, the user's local days), `limit` (default 10) and `offset`, validate them with `FilamentListParams`, and list matches with one line per note: number, quoted title, local date and time (e.g. "Tue Nov 24, 11:30 PM"), tags, a body excerpt of about 200 characters, and the id in brackets. The reply SHALL start with how many notes were found and end with "Showing A–B of Y." (the positions shown) unless every match is on the page. Parameter descriptions SHALL come from the shared schemas.
 
 #### Scenario: No query lists newest first
 - **WHEN** Claude calls `search_filaments` with no arguments
@@ -43,7 +43,11 @@ The MCP server SHALL expose exactly these tools, each calling one API route with
 
 #### Scenario: More results than shown
 - **WHEN** 25 notes match and the limit is 10
-- **THEN** the reply ends with "Showing 10 of 25."
+- **THEN** the reply ends with "Showing 1–10 of 25."
+
+#### Scenario: Last page
+- **WHEN** 25 notes match and Claude asks with offset 20
+- **THEN** the reply numbers them 21 to 25 and ends with "Showing 21–25 of 25."
 
 #### Scenario: Long body
 - **WHEN** a matching note's body is 1,000 characters
@@ -80,7 +84,7 @@ The MCP server SHALL expose exactly these tools, each calling one API route with
 - **THEN** the reply lists `music (5)` before `art (2)`
 
 ### Requirement: Errors are short and speakable
-Tool failures SHALL be raised as tool errors with plain-language messages and no stack traces, JSON or HTTP jargon: validation failures as "<field>: <message>" (joined with "; " when several), API 404 as "No note with that id.", 401 as "The notes server rejected my credentials. Check FILAMENTS_API_TOKEN.", 500 as "The notes server hit an error. It has been logged.", and a connection failure or timeout as "I can't reach the notes server right now." Any other exception SHALL be masked from the client and logged to stderr.
+Tool failures SHALL be raised as tool errors with plain-language messages and no stack traces, JSON or HTTP jargon: validation failures as "<field>: <message>" (joined with "; " when several), the API's own missing-filament 404 as "No note with that id.", any other 404 (a wrong `FILAMENTS_API_URL`) as "The notes server address looks wrong. Check FILAMENTS_API_URL.", a non-JSON success response as the 500 message, 401 as "The notes server rejected my credentials. Check FILAMENTS_API_TOKEN.", 500 as "The notes server hit an error. It has been logged.", and any transport failure (refused, timed out, dropped or reset connection) as "I can't reach the notes server right now." Any other exception SHALL be masked from the client and logged to stderr.
 
 #### Scenario: Unknown id
 - **WHEN** Claude gets a note that doesn't exist or was deleted
@@ -90,12 +94,16 @@ Tool failures SHALL be raised as tool errors with plain-language messages and no
 - **WHEN** the API is not running and Claude calls any tool
 - **THEN** the tool fails with "I can't reach the notes server right now."
 
+#### Scenario: Wrong API address
+- **WHEN** `FILAMENTS_API_URL` lacks `/api` and Claude lists tags
+- **THEN** the tool fails with "The notes server address looks wrong. Check FILAMENTS_API_URL.", not "No note with that id."
+
 #### Scenario: Unexpected bug
 - **WHEN** a tool raises an unexpected exception containing internal details
 - **THEN** the client sees a generic failure without those details, and the traceback is written to stderr
 
 ### Requirement: Stdio entry point
-`python -m filaments_mcp` SHALL run the server over stdio, writing only protocol messages to stdout and all logs to stderr. It SHALL read `FILAMENTS_API_URL` (default `http://127.0.0.1:8000/api`) and `FILAMENTS_API_TOKEN`, and exit with an error on stderr naming the setting when the token is missing.
+`python -m filaments_mcp` SHALL run the server over stdio, writing only protocol messages to stdout and all logs to stderr. It SHALL read `FILAMENTS_API_URL` (default `http://127.0.0.1:8000/api`) and `FILAMENTS_API_TOKEN`, and exit with an error on stderr naming the setting when the token is missing or the URL doesn't start with `http://` or `https://`.
 
 #### Scenario: Local client connects
 - **WHEN** a client launches `python -m filaments_mcp` and lists tools over stdio

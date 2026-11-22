@@ -43,9 +43,8 @@ Filaments v1 planned a custom iOS app and an in-house AI pipeline. In v2, Claude
 - **Search:** Postgres full-text search on title and body (English stemming), where keywords also match tag names; filterable by tags and date range
 - **MCP tools:**
   - `create_filament(title, body, tags)`
-  - `search_filaments(query?, tags?, date_from?, date_to?, limit?)`
+  - `search_filaments(query?, tags?, date_from?, date_to?, limit?, offset?)` — no query lists newest first
   - `get_filament(id)`
-  - `list_filaments(tag?, limit?, offset?)` — newest first
   - `update_filament(id, title?, body?, tags?)`
   - `delete_filament(id)` — soft delete
   - `list_tags()` — all tags with usage counts
@@ -89,7 +88,7 @@ Dictation happens on the phone and custom connectors are remote MCP servers, so 
 | Frontend    | Django templates + HTMX, Tailwind CSS (standalone CLI), Markdown rendering — see `frontend-planning-doc.md` |
 | Backend     | Django 5.2 LTS + Django Ninja (Pydantic schemas, auto OpenAPI docs) |
 | Database    | PostgreSQL with built-in full-text search |
-| MCP server  | Python, official MCP SDK (FastMCP) |
+| MCP server  | Python, FastMCP 4 (gofastmcp.com), built on the official MCP SDK |
 | Auth        | OAuth via django-oauth-toolkit (Claude → MCP server); service bearer token (MCP server → API); Django session login (web UI) |
 | Hosting     | Old laptop as home server, Ubuntu Server (headless), exposed via Cloudflare Tunnel |
 | Other       | Docker Compose, Git |
@@ -114,7 +113,7 @@ See `backend-planning-doc.md` for the full backend design.
 **Dropped from v1:** React Native/Expo app, Whisper transcription, server-side Claude extraction (summary, key ideas, action items), embeddings and pgvector, auto-linking and `FilamentLink`, Celery + Redis, S3, the `/process` endpoint and `pipeline_attempts` recovery, Sign in with Google.
 
 **Notes:**
-- The MCP server is a thin client over the API, so the same API serves both the web UI and Claude.
+- The MCP server is a thin client over the API. The web UI doesn't use the HTTP API: its Django views call the same service and query modules in-process.
 - Request and response schemas are shared Pydantic models (e.g. a `schemas` package). The Ninja endpoints and the MCP tools both import them, so Claude's tool inputs and the API validate against the same definition.
 - Why Ninja over DRF: the API is small and single-client, Pydantic schemas are shared with the MCP SDK, and function-based endpoints mean less boilerplate. Trade-off accepted: smaller ecosystem than DRF and no browsable API (Swagger docs instead).
 - The 30-day soft-delete sweep runs as a Django management command on a system cron job on the laptop.

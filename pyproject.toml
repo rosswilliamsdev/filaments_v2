@@ -8,6 +8,7 @@ dependencies = []
 [dependency-groups]
 dev = [
     "filaments-backend",
+    "filaments-mcp",
     "pytest>=8.3",
     "pytest-django>=4.9",
     "ruff>=0.8",
@@ -17,10 +18,11 @@ dev = [
 package = false
 
 [tool.uv.workspace]
-members = ["backend", "schemas"]
+members = ["backend", "mcp_server", "schemas"]
 
 [tool.uv.sources]
 filaments-backend = { workspace = true }
+filaments-mcp = { workspace = true }
 
 [tool.ruff]
 line-length = 100
@@ -32,9 +34,9 @@ extend-exclude = ["**/migrations/*"]
 select = ["E", "F", "I", "UP", "B", "DJ"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["api", "config", "filaments", "schemas"]
+known-first-party = ["api", "config", "filaments", "filaments_mcp", "schemas"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
 pythonpath = ["backend"]
-testpaths = ["backend/tests", "schemas/tests"]
+testpaths = ["backend/tests", "mcp_server/tests", "schemas/tests"]

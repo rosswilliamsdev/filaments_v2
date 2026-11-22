@@ -98,12 +98,12 @@ Steps 8 and 10 don't depend on the API chain, so they can be done earlier or alo
 **Done when:** Tests confirm 401 without the token and 200 with it.
 
 ### 7. MCP server over stdio
-**Goal:** All seven tools working locally against the real API.
-- FastMCP server in its own `mcp` service, an HTTP client to the API using the service token
-- Tools: `create_filament`, `search_filaments`, `list_filaments`, `get_filament`, `update_filament`, `delete_filament`, `list_tags`
+**Goal:** All six tools working locally against the real API.
+- FastMCP 4 server (`mcp_server/`, run with `python -m filaments_mcp`), an HTTP client to the API using the service token. A stdio server is launched by its client, so the `mcp` Compose service comes in step 9
+- Tools: `create_filament`, `search_filaments`, `get_filament`, `update_filament`, `delete_filament`, `list_tags`
 - Tool inputs use the shared schemas; API errors become readable messages
 - Voice-ready responses: short, plain-language confirmations and errors that make sense read aloud (e.g. "Saved 'Album cover ideas' with tags music, design")
-- **Deferred decision to settle here:** keep `list_filaments` and `search_filaments` separate or merge them
+- ~~Deferred decision~~ settled: `list_filaments` and `search_filaments` merged into `search_filaments` (one tool per API route)
 
 **Done when:** A local Claude client (e.g. Claude Code or Claude Desktop over stdio) can create, find, edit, and delete a filament.
 
@@ -118,7 +118,7 @@ Steps 8 and 10 don't depend on the API chain, so they can be done earlier or alo
 
 ### 9. Remote MCP: Streamable HTTP + tunnel
 **Goal:** The MCP server reachable from claude.ai, protected by OAuth.
-- Streamable HTTP transport alongside the stdio entry point
+- Streamable HTTP transport alongside the stdio entry point, run as the `mcp` service in Docker Compose (API at `http://web:8000/api`)
 - MCP server checks the OAuth token on every request
 - `cloudflared` service in Docker Compose; only the MCP and OAuth endpoints are routed, never `/api/`
 - **Deferred decision to settle here:** the domain for the tunnel hostname

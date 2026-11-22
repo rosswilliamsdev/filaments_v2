@@ -1,0 +1,22 @@
+[project]
+name = "filaments-mcp"
+version = "0.1.0"
+description = "Filaments v2 MCP server: a thin FastMCP client over the API. No Django."
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    # FastMCP 4 (gofastmcp.com), built on the official MCP SDK. Major releases are
+    # frequent, so upgrading past 4.x is a deliberate step.
+    "fastmcp>=4.2,<5",
+    "httpx>=0.28",
+    "filaments-schemas",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/filaments_mcp"]
+
+[tool.uv.sources]
+filaments-schemas = { workspace = true }

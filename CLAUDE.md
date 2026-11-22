@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## Project status
 
-Roadmap steps 1–6 are in place: Docker Compose scaffolding with `GET /api/health`, the `Filament`/`Tag` models, the shared `schemas` package, create/get/update/delete plus list/search under `/api/filaments`, and `/api/tags`, all behind a service bearer token. The MCP server and OAuth come in later steps — check `roadmap.md` before assuming a module exists.
+Roadmap steps 1–7 are in place: Docker Compose scaffolding with `GET /api/health`, the `Filament`/`Tag` models, the shared `schemas` package, create/get/update/delete plus list/search under `/api/filaments`, and `/api/tags`, all behind a service bearer token, and the stdio MCP server with six tools. OAuth, remote MCP and the tunnel come in later steps — check `roadmap.md` before assuming a module exists.
 
 Source of truth, in priority order:
 1. `docs/PRD.md` — scope, goals, non-goals, phasing
@@ -22,10 +22,11 @@ A uv workspace with one lockfile (`uv.lock`). Python 3.13.
 pyproject.toml     # workspace root: dev deps, Ruff and pytest config
 backend/           # filaments-backend: Django project (config/), Ninja API (api/), models + write logic (filaments/services.py) + read/search logic (filaments/queries.py), tests/
 schemas/           # filaments-schemas: shared Pydantic models, import name `schemas`. No Django imports.
+mcp_server/        # filaments-mcp: FastMCP server, import `filaments_mcp`. HTTP client to the API; no Django.
 compose.yaml       # web (gunicorn) + db (postgres:17); both bound to 127.0.0.1 only
 ```
 
-The MCP server will be added as `mcp_server/` (import `filaments_mcp`). Never name a local package `mcp` — it shadows the MCP SDK.
+Never name a local package `mcp` — it shadows the MCP SDK.
 
 ## Commands
 
@@ -39,6 +40,8 @@ uv run --env-file .env backend/manage.py runserver   # dev server with autoreloa
 uv run --env-file .env backend/manage.py migrate
 uv run --env-file .env pytest                    # tests run against the Compose Postgres (needs db up)
 uv run ruff check . && uv run ruff format .      # lint + format
+uv run --env-file .env python -m filaments_mcp   # MCP server over stdio (needs the API up); normally launched by a client
+claude mcp add filaments -- uv run --directory "$PWD" --env-file "$PWD/.env" python -m filaments_mcp   # register with Claude Code
 ```
 
 Logs: console always; in Compose also `logs/django.log` (gitignored).
@@ -49,7 +52,9 @@ If another Postgres already holds port 5432 on the host, set `POSTGRES_PORT` in 
 
 `FILAMENTS_API_TOKEN` (required, 32+ characters) is the bearer token for every API route except `/api/health`; generate it with `uv run python -c "import secrets; print(secrets.token_urlsafe(32))"`. `/api/docs` and `/api/openapi.json` exist only when `DJANGO_DEBUG` is on. Tests use a fixed token from `backend/tests/conftest.py`, whose `client` fixture sends it (`anon_client` doesn't).
 
-`pytest` runs `backend/tests` (needs the db) and `schemas/tests` (no database).
+The MCP server reads `FILAMENTS_API_TOKEN` and `FILAMENTS_API_URL` (default `http://127.0.0.1:8000/api`). It speaks stdio, so stdout is the protocol: log to stderr only, never `print()`.
+
+`pytest` runs `backend/tests` (needs the db; includes an MCP end-to-end test against `live_server`), `mcp_server/tests` and `schemas/tests` (no database).
 
 If a request conflicts with these docs, point out the conflict before writing code. Each planning doc has a **Deferred Decisions** section — don't silently decide those; raise them.
 
@@ -59,14 +64,14 @@ A single-user, private notes store filled by dictating to Claude in the Claude a
 
 ```
 Claude (dictation, phone) → custom connector, HTTPS + OAuth → Cloudflare Tunnel
-  → MCP server (FastMCP, Streamable HTTP) → service token → Django Ninja API (localhost) → Postgres
+  → MCP server (FastMCP 4, Streamable HTTP) → service token → Django Ninja API (localhost) → Postgres
 ```
 
 ## Stack (decided)
 
 - Python only for backend and MCP server
 - Django 5.2 LTS + Django Ninja, PostgreSQL with `django.contrib.postgres` full-text search
-- MCP server: official MCP Python SDK (FastMCP), Streamable HTTP; stdio entry point for local dev only
+- MCP server: FastMCP 4 (gofastmcp.com), built on the official MCP SDK (`fastmcp>=4.2,<5`; the official SDK's own copy is now called `MCPServer`), Streamable HTTP; stdio entry point for local dev only
 - Auth: django-oauth-toolkit (Claude → MCP), service bearer token from `.env` (MCP → API), Django session login (web UI)
 - Phase 2 UI: Django templates + HTMX + Tailwind (standalone CLI, no Node)
 - Docker Compose services: `web`, `db`, `mcp`, `cloudflared`; runs on a home laptop (Ubuntu Server)
@@ -88,7 +93,7 @@ Do **not** add: embeddings/pgvector, auto-linking between notes, server-side LLM
 
 - **Build for voice mode later.** Capture uses dictation today because voice mode can't call custom connector tools yet (tested 2026-11-19). Design as if it will: tool descriptions and results should work when spoken (short, plain-language confirmations and errors), and nothing should require the user to see a screen to complete a capture or search.
 
-- **Shared Pydantic schemas** live in one `schemas` package, imported by both Ninja endpoints and MCP tools. Never duplicate a request/response shape between the two.
+- **Shared Pydantic schemas** live in one `schemas` package, imported by both Ninja endpoints and MCP tools. Never duplicate a request/response shape between the two. MCP tool parameters are plain types (so FastMCP's own validation can't produce unspeakable errors) with descriptions read from the shared models; each tool validates by building the shared model.
 - **The MCP server is a thin client** over the HTTP API. It never touches the database or Django ORM directly. Business logic belongs in Django.
 - MCP tools map one-to-one onto API routes (see `docs/backend-planning-doc.md` → API Design).
 - The API is never exposed through the tunnel. Only the MCP server and OAuth endpoints are public; `/api/health` is the one unauthenticated API route.
