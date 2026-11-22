@@ -1,7 +1,7 @@
 schema: spec-driven
 
 # Project context — shown to AI when creating artifacts.
-# Full detail lives in PRD.md, backend-planning-doc.md, frontend-planning-doc.md.
+# Full detail lives in docs/PRD.md, docs/backend-planning-doc.md, docs/frontend-planning-doc.md.
 context: |
   Domain: Filaments v2, a single-user private notes store. Claude (via dictation)
   turns speech into a note (title, Markdown body, tags) and saves it via a
@@ -39,9 +39,9 @@ context: |
 # Per-artifact rules — applied only when generating that artifact.
 rules:
   proposal:
-    - State which phase the change belongs to (Phase 1 voice capture, Phase 2 web UI, or Future) per PRD.md
+    - State which phase the change belongs to (Phase 1 voice capture, Phase 2 web UI, or Future) per docs/PRD.md
     - If the change touches an item under "Deferred Decisions" in a planning doc, list it as an open question instead of deciding it
-    - Flag any conflict with PRD.md or the planning docs explicitly rather than working around it
+    - Flag any conflict with docs/PRD.md or the planning docs explicitly rather than working around it
   design:
     - Say where each new request/response shape lives in the shared `schemas` package
     - For MCP tool changes, name the API route the tool calls and how its errors are turned into readable tool messages

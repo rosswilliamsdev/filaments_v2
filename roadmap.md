@@ -4,7 +4,7 @@ _Created 2026-11-19_
 
 The order to build Filaments v2, one feature at a time. Each step is sized to be one OpenSpec change (`/opsx:propose` → `/opsx:apply` → `/opsx:archive`) and ends with something you can check works.
 
-Scope and design decisions live in [`PRD.md`](PRD.md), [`backend-planning-doc.md`](backend-planning-doc.md), and [`frontend-planning-doc.md`](frontend-planning-doc.md). This file only covers **order** and **why that order**.
+Scope and design decisions live in [`docs/PRD.md`](docs/PRD.md), [`docs/backend-planning-doc.md`](docs/backend-planning-doc.md), and [`docs/frontend-planning-doc.md`](docs/frontend-planning-doc.md). This file only covers **order** and **why that order**.
 
 ## Ordering principles
 

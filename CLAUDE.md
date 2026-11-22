@@ -7,9 +7,9 @@ Guidance for Claude Code when working in this repository.
 Roadmap step 1 (scaffolding) is in place: a Django project with `GET /api/health`, running in Docker Compose. Models, the real API, the MCP server and OAuth come in later steps — check `roadmap.md` before assuming a module exists.
 
 Source of truth, in priority order:
-1. `PRD.md` — scope, goals, non-goals, phasing
-2. `backend-planning-doc.md` — data model, API, auth, error handling
-3. `frontend-planning-doc.md` — Phase 2 web UI
+1. `docs/PRD.md` — scope, goals, non-goals, phasing
+2. `docs/backend-planning-doc.md` — data model, API, auth, error handling
+3. `docs/frontend-planning-doc.md` — Phase 2 web UI
 4. `openspec/` — change proposals and specs (spec-driven workflow)
 
 `roadmap.md` sets the build order. Each numbered step is meant to be one OpenSpec change; check it to see what comes next and what a step depends on.
@@ -84,7 +84,7 @@ Do **not** add: embeddings/pgvector, auto-linking between notes, server-side LLM
 
 - **Shared Pydantic schemas** live in one `schemas` package, imported by both Ninja endpoints and MCP tools. Never duplicate a request/response shape between the two.
 - **The MCP server is a thin client** over the HTTP API. It never touches the database or Django ORM directly. Business logic belongs in Django.
-- MCP tools map one-to-one onto API routes (see `backend-planning-doc.md` → API Design).
+- MCP tools map one-to-one onto API routes (see `docs/backend-planning-doc.md` → API Design).
 - The API is never exposed through the tunnel. Only the MCP server and OAuth endpoints are public; `/api/health` is the one unauthenticated API route.
 - Errors: Ninja default `{"detail": ...}`. 422s carry field-level detail so Claude can retry. The MCP layer translates API errors into readable messages (e.g. "Tag limit is 8; got 10"). 500s return a generic message; tracebacks go to the log only.
 

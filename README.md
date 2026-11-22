@@ -50,9 +50,9 @@ Claude does the thinking (transcription, cleanup, titling, tagging). The backend
 
 ## Documentation
 
-- [`PRD.md`](PRD.md) — goals, scope, phasing, open questions
-- [`backend-planning-doc.md`](backend-planning-doc.md) — data model, API, auth, error handling
-- [`frontend-planning-doc.md`](frontend-planning-doc.md) — web UI design and UX flows
+- [`docs/PRD.md`](docs/PRD.md) — goals, scope, phasing, open questions
+- [`docs/backend-planning-doc.md`](docs/backend-planning-doc.md) — data model, API, auth, error handling
+- [`docs/frontend-planning-doc.md`](docs/frontend-planning-doc.md) — web UI design and UX flows
 - [`roadmap.md`](roadmap.md) — build order, feature by feature
 - [`openspec/`](openspec/) — spec-driven change proposals
 
