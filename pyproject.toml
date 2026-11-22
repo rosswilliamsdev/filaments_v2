@@ -34,7 +34,7 @@ extend-exclude = ["**/migrations/*"]
 select = ["E", "F", "I", "UP", "B", "DJ"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["api", "config", "filaments", "filaments_mcp", "schemas"]
+known-first-party = ["accounts", "api", "config", "filaments", "filaments_mcp", "schemas"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"

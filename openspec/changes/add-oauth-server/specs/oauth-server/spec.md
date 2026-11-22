@@ -1,11 +1,11 @@
 ## ADDED Requirements
 
 ### Requirement: Authorization server metadata
-The system SHALL publish RFC 8414 metadata at `/.well-known/oauth-authorization-server` with `issuer` equal to `FILAMENTS_PUBLIC_URL`, the authorization, token, revocation and introspection endpoints under that issuer, `code_challenge_methods_supported` containing `S256`, `grant_types_supported` including `authorization_code` and `refresh_token`, and `scopes_supported` including `notes`. It SHALL NOT advertise a registration endpoint or client ID metadata document support.
+The system SHALL publish RFC 8414 metadata at `/.well-known/oauth-authorization-server` with `issuer` equal to `FILAMENTS_PUBLIC_URL`, the authorization, token, revocation and introspection endpoints under that issuer, `code_challenge_methods_supported` containing `S256`, `grant_types_supported` including `authorization_code` and `refresh_token` but not `implicit` or `password`, `response_types_supported` of only `code`, and `scopes_supported` including `notes`. It SHALL NOT advertise a registration endpoint or client ID metadata document support.
 
 #### Scenario: Claude discovers the server
 - **WHEN** a client requests `/.well-known/oauth-authorization-server`
-- **THEN** it receives JSON with the issuer, the four endpoints, `S256` in `code_challenge_methods_supported`, and no `registration_endpoint`
+- **THEN** it receives JSON with the issuer, the four endpoints, only `S256` in `code_challenge_methods_supported`, only `code` in `response_types_supported`, no implicit or password grant, and no `registration_endpoint`
 
 ### Requirement: Only the needed OAuth endpoints exist
 The system SHALL expose authorize, token, revoke and introspect endpoints under `/o/`, and SHALL NOT expose OAuth application-management pages, the device flow, OIDC endpoints or Dynamic Client Registration.
@@ -30,7 +30,7 @@ The system SHALL expose authorize, token, revoke and introspect endpoints under 
 - **THEN** both clients get new secrets, which are printed, and the old secrets stop working
 
 ### Requirement: Authorization code flow with PKCE and resource binding
-The system SHALL issue authorization codes only to registered clients, only to their exact registered redirect URI, and only with a PKCE `S256` code challenge. A signed-out user SHALL be sent to the login page and returned to the authorization request after signing in. The token endpoint SHALL require the client's credentials and the matching `code_verifier`. A `resource` parameter sent with the request SHALL be recorded on the issued tokens. Tokens SHALL carry the `notes` scope.
+The system SHALL issue authorization codes only to registered clients, only to their exact registered redirect URI, and only with a PKCE `S256` code challenge. A signed-out user SHALL be sent to the login page and returned to the authorization request after signing in. The token endpoint SHALL require the client's credentials and the matching `code_verifier`. A `resource` parameter sent with the request SHALL be recorded on the issued tokens. Each client SHALL only be able to obtain its own scope: `notes` for Claude, `introspection` for the MCP client. The `plain` PKCE method SHALL be refused, tokens SHALL NOT be accepted in URLs, the authorization response SHALL carry `iss`, and tokens SHALL be stored only as hashes (RFC 9700).
 
 #### Scenario: Claude connects
 - **WHEN** the Claude client starts authorization with a PKCE S256 challenge and `resource=https://notes.example.com/mcp`, the user signs in, and Claude exchanges the code with its secret and the code verifier
@@ -43,6 +43,18 @@ The system SHALL issue authorization codes only to registered clients, only to t
 #### Scenario: Wrong redirect URI
 - **WHEN** authorization is requested with a redirect URI other than the registered one
 - **THEN** no code is issued and the user is not redirected to that URI
+
+#### Scenario: Claude asks for the introspection scope
+- **WHEN** the Claude client requests scope `introspection`
+- **THEN** no code is issued
+
+#### Scenario: Plain PKCE
+- **WHEN** authorization is requested with `code_challenge_method=plain`
+- **THEN** no code is issued
+
+#### Scenario: Tokens stored hashed
+- **WHEN** a token is issued
+- **THEN** the database does not contain the token value
 
 #### Scenario: Wrong code verifier
 - **WHEN** Claude exchanges a valid code with the wrong code verifier
@@ -64,7 +76,7 @@ Access tokens SHALL expire 1 hour after issue. Refresh tokens SHALL expire 90 da
 - **THEN** it receives a new access token and a new refresh token, and reusing the old refresh token fails
 
 ### Requirement: Introspection for the MCP server
-`/o/introspect/` SHALL accept only the MCP introspection client's credentials and SHALL report for a token: `active`, `scope`, `exp`, `client_id` and, when the token is resource-bound, `aud`. Expired, revoked or unknown tokens SHALL be reported as `active: false`.
+`/o/introspect/` SHALL accept only requests that DOT authenticates as the MCP introspection client (Basic header or form body; a request naming one client and authenticating as another is refused), or a token carrying the `introspection` scope, and SHALL report for a token: `active`, `scope`, `exp`, `client_id` and, when the token is resource-bound, `aud`. Expired, revoked or unknown tokens SHALL be reported as `active: false`.
 
 #### Scenario: Live token
 - **WHEN** the MCP introspection client introspects a live access token
@@ -86,7 +98,7 @@ Access tokens issued by the authorization server SHALL NOT be accepted by `/api/
 - **THEN** the response is 401
 
 ### Requirement: Login page with lockout
-The login page SHALL sign the user in with their Django username and password and work on a phone screen. After 10 failed sign-in attempts from one IP address, further attempts from that address SHALL be refused for 5 minutes after the most recent failure, with the message "Too many failed sign-ins. Try again in a few minutes.", even when the password is correct. A successful sign-in SHALL clear that address's count. The count SHALL be shared across all server workers. Failed and refused attempts SHALL be logged with the IP address and username, never the password.
+The login page SHALL sign the user in with their Django username and password and work on a phone screen. After 10 failed sign-in attempts from one IP address, further attempts from that address SHALL be refused for 5 minutes after the most recent failure, with the message "Too many failed sign-ins. Try again in a few minutes.", even when the password is correct. Each attempt SHALL be counted before the password is checked, so concurrent attempts cannot exceed the limit, and each refused attempt SHALL restart the 5 minutes. A successful sign-in SHALL clear that address's count. The count SHALL be shared across all server workers. A request without a client address SHALL still be handled (counted under a shared placeholder address), never fail with a server error. A direct sign-in without a `next` destination SHALL land in the admin. Failed and refused attempts SHALL be logged with the IP address and username, never the password.
 
 #### Scenario: Tenth failure locks
 - **WHEN** an address fails to sign in 10 times
@@ -95,6 +107,10 @@ The login page SHALL sign the user in with their Django username and password an
 #### Scenario: Lockout expires
 - **WHEN** 5 minutes pass after the last failure
 - **THEN** that address can sign in again
+
+#### Scenario: Guessing while locked keeps it locked
+- **WHEN** a locked-out address keeps trying
+- **THEN** each attempt is refused and restarts the 5 minutes
 
 #### Scenario: Other addresses unaffected
 - **WHEN** one address is locked out

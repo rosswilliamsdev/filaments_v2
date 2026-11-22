@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## Project status
 
-Roadmap steps 1–7 are in place: Docker Compose scaffolding with `GET /api/health`, the `Filament`/`Tag` models, the shared `schemas` package, create/get/update/delete plus list/search under `/api/filaments`, and `/api/tags`, all behind a service bearer token, and the stdio MCP server with six tools. OAuth, remote MCP and the tunnel come in later steps — check `roadmap.md` before assuming a module exists.
+Roadmap steps 1–8 are in place: Docker Compose scaffolding with `GET /api/health`, the `Filament`/`Tag` models, the shared `schemas` package, create/get/update/delete plus list/search under `/api/filaments`, and `/api/tags`, all behind a service bearer token, the stdio MCP server with six tools, and the OAuth authorization server (django-oauth-toolkit) with its login page. Remote MCP and the tunnel come in step 9 — check `roadmap.md` before assuming a module exists.
 
 Source of truth, in priority order:
 1. `docs/PRD.md` — scope, goals, non-goals, phasing
@@ -20,7 +20,7 @@ A uv workspace with one lockfile (`uv.lock`). Python 3.13.
 
 ```
 pyproject.toml     # workspace root: dev deps, Ruff and pytest config
-backend/           # filaments-backend: Django project (config/), Ninja API (api/), models + write logic (filaments/services.py) + read/search logic (filaments/queries.py), tests/
+backend/           # filaments-backend: Django project (config/), Ninja API (api/), models + write logic (filaments/services.py) + read/search logic (filaments/queries.py), OAuth clients + login lockout (accounts/), tests/
 schemas/           # filaments-schemas: shared Pydantic models, import name `schemas`. No Django imports.
 mcp_server/        # filaments-mcp: FastMCP server, import `filaments_mcp`. HTTP client to the API; no Django.
 compose.yaml       # web (gunicorn) + db (postgres:17); both bound to 127.0.0.1 only
@@ -39,6 +39,8 @@ docker compose up -d db                          # db only, for local dev and te
 uv run --env-file .env backend/manage.py runserver   # dev server with autoreload (needs db up)
 uv run --env-file .env backend/manage.py migrate
 uv run --env-file .env pytest                    # tests run against the Compose Postgres (needs db up)
+docker compose exec web python manage.py createsuperuser      # your account (OAuth sign-in, admin)
+docker compose exec web python manage.py setup_oauth_clients  # Claude + MCP clients; prints secrets once (--rotate for new)
 uv run ruff check . && uv run ruff format .      # lint + format
 uv run --env-file .env python -m filaments_mcp   # MCP server over stdio (needs the API up); normally launched by a client
 claude mcp add filaments -- uv run --directory "$PWD" --env-file "$PWD/.env" python -m filaments_mcp   # register with Claude Code
@@ -50,7 +52,9 @@ If another Postgres already holds port 5432 on the host, set `POSTGRES_PORT` in 
 
 `FILAMENTS_TIMEZONE` (IANA name, e.g. `America/Chicago`; default `UTC`) sets Django's `TIME_ZONE`. Timestamps are stored in UTC; the home zone decides what a calendar day means for date filters. An unknown name stops startup.
 
-`FILAMENTS_API_TOKEN` (required, 32+ characters) is the bearer token for every API route except `/api/health`; generate it with `uv run python -c "import secrets; print(secrets.token_urlsafe(32))"`. `/api/docs` and `/api/openapi.json` exist only when `DJANGO_DEBUG` is on. Tests use a fixed token from `backend/tests/conftest.py`, whose `client` fixture sends it (`anon_client` doesn't).
+`FILAMENTS_API_TOKEN` (required, 32+ characters) is the bearer token for every API route except `/api/health`; generate it with `uv run python -c "import secrets; print(secrets.token_urlsafe(32))"`. `FILAMENTS_PUBLIC_URL` (default `http://127.0.0.1:8000`) is the OAuth issuer: the public base URL Claude signs in to (the tunnel URL in step 9). OAuth endpoints: `/.well-known/oauth-authorization-server`, `/o/{authorize,token,revoke_token,introspect}/`, login at `/accounts/login/`. OAuth tokens never work on `/api/`.
+
+`/api/docs` and `/api/openapi.json` exist only when `DJANGO_DEBUG` is on. Tests use a fixed token from `backend/tests/conftest.py`, whose `client` fixture sends it (`anon_client` doesn't).
 
 The MCP server reads `FILAMENTS_API_TOKEN` and `FILAMENTS_API_URL` (default `http://127.0.0.1:8000/api`). It speaks stdio, so stdout is the protocol: log to stderr only, never `print()`.
 

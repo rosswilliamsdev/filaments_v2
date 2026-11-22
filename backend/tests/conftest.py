@@ -17,6 +17,12 @@ def api_token(settings):
     return TEST_TOKEN
 
 
+@pytest.fixture(autouse=True)
+def fast_password_hashing(settings):
+    # Production hashing is deliberately slow; sign-in tests make dozens of attempts.
+    settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
+
 @pytest.fixture
 def client(api_token):
     """Django test client that authenticates to the API with the test token."""

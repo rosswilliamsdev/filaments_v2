@@ -50,6 +50,14 @@ def env_timezone(key: str, default: str = "UTC") -> str:
     return name
 
 
+def env_url(key: str, default: str) -> str:
+    """An absolute http(s) URL without a trailing slash."""
+    url = (os.environ.get(key, "").strip() or default).rstrip("/")
+    if not url.startswith(("http://", "https://")):
+        raise ImproperlyConfigured(f"{key} must start with http:// or https://")
+    return url
+
+
 SECRET_KEY = env_required("DJANGO_SECRET_KEY")
 # Bearer token the MCP server sends to the API (its only caller). See api/auth.py.
 FILAMENTS_API_TOKEN = env_token("FILAMENTS_API_TOKEN")
@@ -65,6 +73,8 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.postgres",
+    "oauth2_provider",
+    "accounts",
     "filaments",
 ]
 
@@ -126,6 +136,45 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# --- OAuth (Claude -> MCP server) ---------------------------------------------------
+# The public base URL people and Claude reach this server at: the OAuth issuer.
+# Local default; the tunnel URL in step 9.
+FILAMENTS_PUBLIC_URL = env_url("FILAMENTS_PUBLIC_URL", "http://127.0.0.1:8000")
+
+LOGIN_URL = "/accounts/login/"
+# OAuth sign-ins return to Claude via `next`; a direct sign-in lands in the admin until
+# the Phase 2 web UI exists.
+LOGIN_REDIRECT_URL = "/admin/"
+
+OAUTH2_PROVIDER = {
+    "SCOPES": {
+        "notes": "Read and write your notes",
+        "introspection": "Check access tokens (the MCP server)",
+    },
+    "DEFAULT_SCOPES": ["notes"],
+    # Each client gets only its own scope (Claude: notes; the MCP server: introspection).
+    "SCOPES_BACKEND_CLASS": "accounts.scopes.PerClientScopes",
+    "ACCESS_TOKEN_EXPIRE_SECONDS": 60 * 60,  # 1 hour
+    "REFRESH_TOKEN_EXPIRE_SECONDS": 90 * 24 * 60 * 60,  # 90 days, renewed by rotation
+    "ROTATE_REFRESH_TOKEN": True,
+    "PKCE_REQUIRED": True,
+    # Plain http only for local testing.
+    "ALLOWED_REDIRECT_URI_SCHEMES": ["https", "http"] if DEBUG else ["https"],
+    # Used as the RFC 8414 issuer even though OIDC itself is off.
+    "OIDC_ISS_ENDPOINT": FILAMENTS_PUBLIC_URL,
+    "OIDC_ENABLED": False,
+    "DCR_ENABLED": False,
+    "CIMD_ENABLED": False,
+    # RFC 9700 (OAuth security best practice), as OAuth 2.1 and the MCP spec expect.
+    # DOT defaults these off for compatibility and turns them on in 4.0.
+    "COMPLIANT_BCP_RFC9700_IMPLICIT_GRANT": True,  # no implicit grant
+    "COMPLIANT_BCP_RFC9700_PASSWORD_GRANT": True,  # no password grant
+    "COMPLIANT_BCP_RFC9700_PKCE_METHOD": True,  # S256 only, never "plain"
+    "COMPLIANT_BCP_RFC9700_ACCESS_TOKEN_TRANSPORT": True,  # no tokens in URLs
+    "COMPLIANT_BCP_RFC9700_AUTHZ_RESPONSE_ISS": True,  # iss on redirects (mix-up defense)
+    "COMPLIANT_BCP_RFC9700_TOKEN_STORAGE": True,  # store token hashes, not tokens
+}
 
 # Logging: console always; a file too when DJANGO_LOG_FILE is set (the laptop).
 LOG_FILE = os.environ.get("DJANGO_LOG_FILE", "").strip()

@@ -66,7 +66,7 @@ REST with Django Ninja, all routes under `/api/`, no version prefix (single clie
 - **Unexpected errors:** return a generic 500 message; the full traceback goes to the log only.
 
 ## Auth & Authorization
-- **Claude → MCP server:** OAuth, with django-oauth-toolkit as the authorization server. The MCP server validates the access token on every request. Signing in during the connector setup uses Ross's Django account.
+- **Claude → MCP server:** OAuth, with django-oauth-toolkit 3.4 as the authorization server (RFC 8414 metadata, PKCE S256, RFC 8707 resource binding). Claude is a **pre-registered client** ("Use your own OAuth client" in claude.ai), created with `manage.py setup_oauth_clients`; Dynamic Client Registration and CIMD are off. Access tokens last 1 hour, refresh tokens 90 days and rotate on use. The MCP server validates every access token by **introspection** (`/o/introspect/`, RFC 7662, restricted to its own client) and requires the `notes` scope and its own URL in `aud`. Signing in uses Ross's Django account at `/accounts/login/`.
 - **MCP server → API:** a service bearer token (`FILAMENTS_API_TOKEN` in `.env`, at least 32 characters), checked by a small custom Ninja auth class applied to the whole API; only `/api/health` opts out. The MCP server is the token's only holder: the web UI calls the service and query modules in-process. The API listens on the Docker network and localhost only; it is never exposed through the tunnel.
 - **Web UI (Phase 2):** Django session login.
 - **Roles, permissions, multi-tenancy:** none — single user.
@@ -77,7 +77,7 @@ REST with Django Ninja, all routes under `/api/`, no version prefix (single clie
 - **Transactions:** creating or updating a filament and its tags runs in one database transaction.
 - **Background jobs:** none, apart from the nightly cron jobs for the soft-delete sweep and backups.
 - **External dependencies:** Cloudflare Tunnel only. If the tunnel or the laptop is down, capture fails and Claude reports the tool error.
-- **Rate limiting:** none at the app level. OAuth guards the MCP server and Cloudflare sits in front.
+- **Rate limiting:** none at the app level, with one exception: the login page locks an IP address out for 5 minutes after 10 failed sign-ins (`accounts/throttle.py`). OAuth guards the MCP server and Cloudflare sits in front.
 
 ## Performance & Scalability
 - **Load:** one user, low volume.
@@ -99,8 +99,6 @@ REST with Django Ninja, all routes under `/api/`, no version prefix (single clie
 - **Compliance:** none formal; all data stays on owned hardware.
 
 ## Deferred Decisions
-- Exact OAuth details Claude's custom connectors require (e.g. dynamic client registration, PKCE, token lifetimes)
-- How the MCP server validates OAuth tokens: introspection against Django (RFC 7662) or self-contained JWTs it verifies itself. It never reads the token table, because the MCP server does not touch the database
 - Backup destination and restore test
 - Domain name for the Cloudflare Tunnel hostname
 

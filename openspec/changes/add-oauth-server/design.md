@@ -65,6 +65,12 @@ LOGIN_URL = "/accounts/login/"
 
 A refresh token's 90 days count from when it was issued; rotation issues a fresh one each use, so regular use never forces a new sign-in.
 
+### Found during implementation
+
+- **Per-client scopes.** DOT lets any client request any configured scope, so Claude's client could have asked for `introspection`. `accounts.scopes.PerClientScopes` (`SCOPES_BACKEND_CLASS`) gives each client only its own scope; the metadata document still lists both.
+- **Introspection narrowed to the MCP client.** DOT's `IntrospectTokenView` accepts the credentials of *any* registered client. `accounts.introspection.McpIntrospectTokenView` authenticates exactly as DOT does but keeps the oauthlib request and checks *which* client was authenticated. (Code review found the first version re-read the client id from the header, which a request could set to the MCP client while authenticating as Claude in the body.) Other callers fall through to DOT's token check, which needs the `introspection` scope that only the MCP client can get.
+- **RFC 9700 flags on.** DOT 3.4 ships OAuth security best-practice behavior behind `COMPLIANT_BCP_RFC9700_*` flags that default off until 4.0. All six behavior flags are on: no implicit or password grant (so metadata advertises only `code`), PKCE `S256` only, no tokens in URLs, `iss` on authorization responses (RFC 9207 mix-up defense), and tokens stored as hashes so a database backup holds no usable tokens.
+
 ### Introspection decides the deferred question
 
 DOT access tokens are opaque, so the MCP server checks them by introspection (RFC 7662), not as JWTs: no custom token generator or signing keys. `/o/introspect/` requires a client holding the `introspection` scope; DOT accepts the client's ID and secret as HTTP Basic credentials. Step 9's MCP server calls it over the Docker network and requires `active`, scope `notes`, and its canonical URL in `aud`. FastMCP's `introspection` verifier covers that call.
@@ -80,9 +86,9 @@ class LoginThrottle(models.Model):
     last_failure = models.DateTimeField()
 ```
 
-- Before checking credentials: if `failures >= 10` and `last_failure` is under 5 minutes ago, refuse with the lockout message (status 429) without checking the password.
-- On failure: increment (or reset to 1 when the previous lockout window has passed) and set `last_failure`, inside `select_for_update` so concurrent requests can't undercount.
+- Every attempt is **reserved before the password is checked**, under `select_for_update`: if `failures >= 10` and `last_failure` is under 5 minutes ago, refuse (429) and set `last_failure` to now, so guessing while locked keeps it locked; otherwise increment (resetting to 1 when the previous run is stale) and continue. Counting first means concurrent requests can't each slip a guess past the limit during the slow password hash. (Revised after code review; the first version counted only after a failed check.)
 - On success: delete the row.
+- An empty `REMOTE_ADDR` falls back to `0.0.0.0` (one shared bucket) instead of failing the not-null column.
 - Log failures and refusals at warning level with IP and username; never the password.
 
 **Why a model, not the cache:** gunicorn runs two workers, so an in-memory cache would give each worker its own count. A database cache would need `createcachetable` on every deploy. A model is shared, migrated like everything else, and easy to test. **Why not django-axes:** it would be a new dependency for about forty lines of behavior.
