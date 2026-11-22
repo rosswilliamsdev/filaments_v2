@@ -75,7 +75,7 @@ The system SHALL remove duplicate tags after normalization, keeping the first oc
 - **THEN** the field is ignored and does not reach the server's write logic
 
 ### Requirement: Updating a filament only changes the fields sent
-`FilamentUpdate` SHALL treat every field as optional. An omitted field SHALL mean "leave unchanged". `tags: []` SHALL clear all tags, and a tag list SHALL replace the whole set. `title`, `body` or `tags` sent as `null` SHALL be rejected. The schema SHALL report which fields were sent.
+`FilamentUpdate` SHALL treat every field as optional. An omitted field SHALL mean "leave unchanged". `tags: []` SHALL clear all tags, and a tag list SHALL replace the whole set. `title`, `body` or `tags` sent as `null` SHALL be rejected. An update that sends none of `title`, `body` or `tags` SHALL be rejected with the message "Send at least one of title, body or tags". The schema SHALL report which fields were sent.
 
 #### Scenario: Change only the title
 - **WHEN** Claude sends `{"title": "Album cover, v2"}`
@@ -88,6 +88,10 @@ The system SHALL remove duplicate tags after normalization, keeping the first oc
 #### Scenario: Null title
 - **WHEN** Claude sends `{"title": null}`
 - **THEN** the request is rejected with a validation error on `title`
+
+#### Scenario: Empty update
+- **WHEN** Claude sends `{}`
+- **THEN** the request is rejected with "Send at least one of title, body or tags"
 
 ### Requirement: Read shapes
 `FilamentOut` SHALL contain `id`, `title`, `body`, `tags` (a list of tag names), `source`, `created_at` and `updated_at`, and SHALL NOT contain `deleted_at`. `TagWithCount` SHALL contain `name` and `count`. `FilamentList` SHALL contain `items`, `total`, `limit` and `offset`. All shapes SHALL be flat (no nested objects other than lists of `FilamentOut` or of tag names).
