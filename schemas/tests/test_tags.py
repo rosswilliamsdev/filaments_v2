@@ -18,6 +18,16 @@ from schemas.tags import MAX_TAG_LENGTH, normalize_tag, normalize_tags
         ("Crème Brûlée", "creme-brulee"),
         ("Музыка", "музыка"),
         ("2026", "2026"),
+        # NFKD can produce capitals, so lowercasing happens after it.
+        ("Acme™", "acmetm"),
+        ("ℌistory", "history"),
+        ("𝐀rt", "art"),
+        ("İstanbul", "istanbul"),
+        ("Tiếng Việt", "tieng-viet"),
+        # Marks that belong to non-Latin letters are kept, not stripped or hyphenated.
+        ("ギター", "ギター"),
+        ("संगीत", "संगीत"),
+        ("Йога", "йога"),
     ],
 )
 def test_normalize_tag(raw, expected):
@@ -28,6 +38,13 @@ def test_normalize_tag(raw, expected):
 def test_empty_after_normalization_rejected(raw):
     with pytest.raises(ValueError, match="empty after removing punctuation"):
         normalize_tag(raw)
+
+
+def test_empty_tag_message_is_truncated():
+    with pytest.raises(ValueError) as exc:
+        normalize_tag("-" * 5000)
+
+    assert len(str(exc.value)) < 80
 
 
 def test_length_limit_applies_after_normalization():

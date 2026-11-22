@@ -78,12 +78,22 @@ class FilamentCreate(BaseModel):
     tags: WriteTags = []
 
 
+def _drop_null_defaults(schema: dict[str, Any]) -> None:
+    # The None defaults only mark a field as optional; advertising `default: null`
+    # would invite Claude to send null, which is rejected.
+    for prop in schema.get("properties", {}).values():
+        if "default" in prop and prop["default"] is None:
+            del prop["default"]
+
+
 class FilamentUpdate(BaseModel):
     """PATCH: omitted fields are unchanged; `tags: []` clears; a tag list replaces the set.
 
     Fields are typed without `| None` so an explicit null is rejected and the JSON schema
     never suggests null. Defaults aren't validated, so omitting a field still works.
     """
+
+    model_config = ConfigDict(json_schema_extra=_drop_null_defaults)
 
     title: Title = None  # type: ignore[assignment]
     body: Body = None  # type: ignore[assignment]
@@ -94,13 +104,29 @@ class FilamentUpdate(BaseModel):
         return self.model_dump(include=self.model_fields_set)
 
 
+def _tag_names(value: Any) -> Any:
+    """Accept a Django related manager or queryset of tags as well as a list of names.
+
+    Duck-typed so this package never imports Django.
+    """
+    if callable(getattr(value, "all", None)):
+        value = value.all()
+    if isinstance(value, (str, bytes, dict)):
+        return value  # let the list[str] check reject it
+    try:
+        items = list(value)
+    except TypeError:
+        return value
+    return [item if isinstance(item, str) else getattr(item, "name", item) for item in items]
+
+
 class FilamentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     title: str
     body: str
-    tags: Annotated[list[str], AfterValidator(sorted)]
+    tags: Annotated[list[str], BeforeValidator(_tag_names), AfterValidator(sorted)]
     source: Literal["claude", "web"]
     created_at: dt.datetime
     updated_at: dt.datetime

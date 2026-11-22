@@ -5,35 +5,65 @@ normalize tags without building a Pydantic model. Error messages are short and
 plain enough to be read aloud by Claude.
 """
 
-import re
 import unicodedata
 
 from pydantic import BaseModel
 
 MAX_TAGS = 8
 MAX_TAG_LENGTH = 50
-
-# `\W` excludes `_` (it counts as a word character), so name it explicitly.
-_SEPARATORS = re.compile(r"[\W_]+")
+_PREVIEW_LENGTH = 20
 
 
 def _strip_accents(text: str) -> str:
-    decomposed = unicodedata.normalize("NFKD", text)
-    return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    """Drop accent marks from Latin letters only.
+
+    Marks on other scripts are part of the letter (Japanese voicing marks,
+    Devanagari vowel signs), so they are kept and the text is recomposed.
+    """
+    kept = []
+    base_is_latin = False
+    for ch in unicodedata.normalize("NFKD", text):
+        if unicodedata.combining(ch):
+            if base_is_latin:
+                continue
+        else:
+            base_is_latin = ch.isascii()
+        kept.append(ch)
+    return unicodedata.normalize("NFC", "".join(kept))
+
+
+def _is_tag_char(ch: str) -> bool:
+    # Marks count as part of a word; `_` and everything else is a separator.
+    return ch.isalnum() or unicodedata.category(ch).startswith("M")
+
+
+def _hyphenate(text: str) -> str:
+    """Replace each run of non-letters/digits with one "-" and trim "-" from the ends."""
+    out: list[str] = []
+    for ch in text:
+        if _is_tag_char(ch):
+            out.append(ch)
+        elif out and out[-1] != "-":
+            out.append("-")
+    return "".join(out).strip("-")
+
+
+def _preview(text: str) -> str:
+    return text if len(text) <= _PREVIEW_LENGTH else text[:_PREVIEW_LENGTH] + "…"
 
 
 def normalize_tag(raw: str) -> str:
     """Return the canonical form of one tag, or raise ValueError.
 
-    trim -> lowercase -> strip accents -> runs of non-letters/digits become "-"
-    -> trim "-". Empty or over-long results are rejected, never dropped or cut.
+    trim -> strip accents -> lowercase -> runs of non-letters/digits become "-"
+    -> trim "-". Lowercasing comes after decomposition because NFKD can produce
+    capitals ("™" -> "TM"). Empty or over-long results are rejected, never dropped or cut.
     """
-    tag = _strip_accents(raw.strip().lower())
-    tag = _SEPARATORS.sub("-", tag).strip("-")
+    tag = _hyphenate(_strip_accents(raw.strip()).lower())
     if not tag:
-        raise ValueError(f"Tag '{raw}' is empty after removing punctuation")
+        raise ValueError(f"Tag '{_preview(raw)}' is empty after removing punctuation")
     if len(tag) > MAX_TAG_LENGTH:
-        raise ValueError(f"Tag '{tag[:20]}…' is longer than {MAX_TAG_LENGTH} characters")
+        raise ValueError(f"Tag '{_preview(tag)}' is longer than {MAX_TAG_LENGTH} characters")
     return tag
 
 

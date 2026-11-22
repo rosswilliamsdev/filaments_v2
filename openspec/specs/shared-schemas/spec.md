@@ -11,7 +11,7 @@ The `schemas` package SHALL be importable without Django installed or configured
 - **THEN** no `django` module is loaded
 
 ### Requirement: Tags are normalized before validation
-The system SHALL normalize each tag by: trimming whitespace, lowercasing, removing accent marks, replacing each run of characters that are not letters or digits (including spaces, punctuation and `_`) with a single `-`, and trimming leading and trailing `-`. Letters and digits from non-Latin scripts SHALL be kept. The same normalization SHALL be available as a plain function outside the Pydantic models.
+The system SHALL normalize each tag by: trimming whitespace, lowercasing, removing accent marks, replacing each run of characters that are not letters or digits (including spaces, punctuation and `_`) with a single `-`, and trimming leading and trailing `-`. Letters and digits from non-Latin scripts SHALL be kept, including the marks that belong to them (e.g. Japanese voicing marks, Devanagari vowel signs); accent marks are removed only from Latin letters. Lowercasing SHALL happen after accent removal so compatibility characters such as `™` come out lowercase. The same normalization SHALL be available as a plain function outside the Pydantic models.
 
 #### Scenario: Mixed-case tag with spaces
 - **WHEN** Claude sends the tag " Album Art "

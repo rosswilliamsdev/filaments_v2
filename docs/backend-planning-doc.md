@@ -37,7 +37,7 @@ A private notes repository filled by dictating to Claude in the Claude app. Clau
 
 ### Notes
 - **Soft delete:** the default manager excludes rows with `deleted_at` set. A management command hard-deletes filaments soft-deleted more than 30 days ago; a system cron job on the laptop runs it nightly.
-- **Tag normalization** happens server-side on every write: trim, lowercase, strip accents, each run of non-letters/digits (spaces, punctuation, `_`) → one hyphen, trim hyphens, dedupe, then get-or-create. Empty or over-long tags are rejected rather than fixed; the 8-tag limit counts tags after dedupe. Implemented in `schemas/tags.py`.
+- **Tag normalization** happens server-side on every write: trim, strip accents from Latin letters, lowercase, each run of non-letters/digits (spaces, punctuation, `_`) → one hyphen, trim hyphens, dedupe, then get-or-create. Empty or over-long tags are rejected rather than fixed; the 8-tag limit counts tags after dedupe. Implemented in `schemas/tags.py`.
 - **No versioning or edit history.**
 
 ## API Design

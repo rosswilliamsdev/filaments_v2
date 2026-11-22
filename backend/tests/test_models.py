@@ -8,6 +8,7 @@ from django.db import DataError, IntegrityError, transaction
 from django.db.models import F
 
 from filaments.models import Filament, Tag
+from schemas import FilamentOut
 
 pytestmark = pytest.mark.django_db
 
@@ -164,3 +165,17 @@ def test_admin_lists_soft_deleted_filaments(admin_client):
     assert "Deleted note" in response.text
     assert "Deleted note" in deleted_only.text
     assert "Still here" not in deleted_only.text
+
+
+# --- Shared output schema --------------------------------------------------------
+
+
+def test_filament_out_reads_a_model_instance():
+    filament = make_filament()
+    filament.tags.add(Tag.objects.create(name="music"), Tag.objects.create(name="design"))
+
+    out = FilamentOut.model_validate(filament)
+
+    assert out.id == filament.id
+    assert out.tags == ["design", "music"]
+    assert out.source == "claude"

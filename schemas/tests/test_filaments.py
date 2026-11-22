@@ -142,6 +142,8 @@ def test_update_schema_does_not_offer_null():
 
     assert properties["title"]["type"] == "string"
     assert "anyOf" not in properties["title"]
+    for name in ("title", "body", "tags"):
+        assert "default" not in properties[name], name
 
 
 # --- Output ---------------------------------------------------------------------
@@ -166,6 +168,22 @@ def test_output_omits_deleted_at_and_sorts_tags():
 
     assert "deleted_at" not in data
     assert data["tags"] == ["design", "music"]
+
+
+class FakeManager:
+    """Stands in for a Django related manager: `.all()` returns Tag-like objects."""
+
+    def __init__(self, names):
+        self._tags = [SimpleNamespace(name=n) for n in names]
+
+    def all(self):
+        return list(self._tags)
+
+
+def test_output_accepts_related_manager_of_tags():
+    out = make_out(tags=FakeManager(["music", "design"]))
+
+    assert out.tags == ["design", "music"]
 
 
 def test_list_shape():

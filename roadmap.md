@@ -67,7 +67,7 @@ Steps 8 and 10 don't depend on the API chain, so they can be done earlier or alo
 ### 3. Shared schemas + tag normalization
 **Goal:** One place that defines every request and response shape.
 - `schemas` package: create/update/read filament, tag-with-count, list/search params
-- Tag normalization (trim → lowercase → strip accents → non-letters/digits to hyphens → dedupe) and the 8-tag limit, as validators
+- Tag normalization (trim → strip accents → lowercase → non-letters/digits to hyphens → dedupe) and the 8-tag limit, as validators
 - Home timezone (`FILAMENTS_TIMEZONE`) so date filters mean the user's local day
 - No Django imports in `schemas`, so the MCP server can install it on its own
 

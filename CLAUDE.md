@@ -77,7 +77,7 @@ Do **not** add: embeddings/pgvector, auto-linking between notes, server-side LLM
 ## Domain rules
 
 - **Filament:** UUID id, `title`, `body` (Markdown), `tags` (M2M), `source` (`"claude"` | `"web"`), `search_vector`, `created_at`, `updated_at`, `deleted_at`.
-- **Tag:** unique `name`, lowercase, hyphenated. Normalize server-side on every write: trim → lowercase → strip accents → each run of non-letters/digits (spaces, punctuation, `_`) to one `-` → trim `-` → dedupe → get-or-create. Empty or >50-character tags are rejected, not fixed. Max 8 tags per filament, counted after dedupe. Rules live in `schemas/tags.py`.
+- **Tag:** unique `name`, lowercase, hyphenated. Normalize server-side on every write: trim → strip accents (Latin letters only) → lowercase → each run of non-letters/digits (spaces, punctuation, `_`) to one `-` → trim `-` → dedupe → get-or-create. Empty or >50-character tags are rejected, not fixed. Max 8 tags per filament, counted after dedupe. Rules live in `schemas/tags.py`.
 - **Soft delete:** default manager excludes `deleted_at IS NOT NULL`. A management command (nightly cron) hard-deletes rows soft-deleted >30 days ago.
 - **Search:** `search_vector` weights title A, body B, GIN index. Order by rank when `q` is present, else `created_at` desc. `tags` filter means *all* must match.
 - Filament + tag writes happen in a single transaction.
