@@ -7,6 +7,7 @@ deployment.
 
 import os
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.core.exceptions import ImproperlyConfigured
 
@@ -29,6 +30,16 @@ def env_bool(key: str, default: bool = False) -> bool:
 
 def env_list(key: str, default: str = "") -> list[str]:
     return [item.strip() for item in os.environ.get(key, default).split(",") if item.strip()]
+
+
+def env_timezone(key: str, default: str = "UTC") -> str:
+    """An IANA timezone name, checked at startup so a typo fails loudly."""
+    name = os.environ.get(key, "").strip() or default
+    try:
+        ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError):
+        raise ImproperlyConfigured(f"{key} is not a known timezone: {name!r}") from None
+    return name
 
 
 SECRET_KEY = env_required("DJANGO_SECRET_KEY")
@@ -95,7 +106,9 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = "UTC"
+# Timestamps are stored in UTC (USE_TZ); the home timezone decides what "today" or
+# "last Tuesday" means for date filters and how times are shown.
+TIME_ZONE = env_timezone("FILAMENTS_TIMEZONE")
 USE_I18N = True
 USE_TZ = True
 

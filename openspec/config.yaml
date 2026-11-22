@@ -27,7 +27,7 @@ context: |
   Domain rules:
   - Filament: UUID id, title, body (Markdown), tags (M2M), source ("claude" | "web"),
     search_vector (title weight A, body weight B, GIN), created_at, updated_at, deleted_at.
-  - Tags: unique, normalized server-side (trim, lowercase, spaces -> hyphens), max 8 per filament.
+  - Tags: unique, normalized server-side (trim, lowercase, strip accents, non-letters/digits -> hyphens, dedupe), max 8 per filament after dedupe.
   - Soft delete via deleted_at; nightly command purges rows deleted > 30 days ago.
   - Filament + tag writes happen in one transaction.
   - Errors: {"detail": ...}; 422s carry field-level detail so Claude can retry.

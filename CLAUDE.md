@@ -45,6 +45,10 @@ Logs: console always; in Compose also `logs/django.log` (gitignored).
 
 If another Postgres already holds port 5432 on the host, set `POSTGRES_PORT` in `.env` to a free port (e.g. 5433); Compose publishes the db on that port and `web` still uses 5432 internally.
 
+`FILAMENTS_TIMEZONE` (IANA name, e.g. `America/Chicago`; default `UTC`) sets Django's `TIME_ZONE`. Timestamps are stored in UTC; the home zone decides what a calendar day means for date filters. An unknown name stops startup.
+
+`pytest` runs `backend/tests` (needs the db) and `schemas/tests` (no database).
+
 If a request conflicts with these docs, point out the conflict before writing code. Each planning doc has a **Deferred Decisions** section — don't silently decide those; raise them.
 
 ## What Filaments v2 is
@@ -73,7 +77,7 @@ Do **not** add: embeddings/pgvector, auto-linking between notes, server-side LLM
 ## Domain rules
 
 - **Filament:** UUID id, `title`, `body` (Markdown), `tags` (M2M), `source` (`"claude"` | `"web"`), `search_vector`, `created_at`, `updated_at`, `deleted_at`.
-- **Tag:** unique `name`, lowercase, hyphenated. Normalize server-side on every write: trim → lowercase → spaces to hyphens → get-or-create. Max 8 tags per filament.
+- **Tag:** unique `name`, lowercase, hyphenated. Normalize server-side on every write: trim → lowercase → strip accents → each run of non-letters/digits (spaces, punctuation, `_`) to one `-` → trim `-` → dedupe → get-or-create. Empty or >50-character tags are rejected, not fixed. Max 8 tags per filament, counted after dedupe. Rules live in `schemas/tags.py`.
 - **Soft delete:** default manager excludes `deleted_at IS NOT NULL`. A management command (nightly cron) hard-deletes rows soft-deleted >30 days ago.
 - **Search:** `search_vector` weights title A, body B, GIN index. Order by rank when `q` is present, else `created_at` desc. `tags` filter means *all* must match.
 - Filament + tag writes happen in a single transaction.

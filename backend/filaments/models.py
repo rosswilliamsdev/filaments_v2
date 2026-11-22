@@ -8,7 +8,7 @@ from django.utils import timezone
 
 
 class Tag(models.Model):
-    """A tag name. Normalization (trim, lowercase, hyphens) happens in the schemas
+    """A tag name. Normalization (see `schemas.tags.normalize_tag`) happens in the schemas
     package before writes; the constraints here are only a backstop."""
 
     name = models.CharField(max_length=50, unique=True)

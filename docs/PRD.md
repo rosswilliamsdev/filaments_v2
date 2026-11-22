@@ -39,7 +39,7 @@ Filaments v1 planned a custom iOS app and an in-house AI pipeline. In v2, Claude
 
 ### In Scope
 - **Capture via Claude:** Claude cleans up the spoken text, writes a title, picks tags (reusing existing ones via `list_tags`), and calls `create_filament`
-- **Tags:** lowercase, hyphenated, ≤8 per filament
+- **Tags:** lowercase, hyphenated (punctuation and accents normalized away), ≤8 per filament
 - **Search:** Postgres full-text search on title and body (English stemming), where keywords also match tag names; filterable by tags and date range
 - **MCP tools:**
   - `create_filament(title, body, tags)`

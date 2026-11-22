@@ -37,4 +37,4 @@ known-first-party = ["api", "config", "filaments", "schemas"]
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
 pythonpath = ["backend"]
-testpaths = ["backend/tests"]
+testpaths = ["backend/tests", "schemas/tests"]
