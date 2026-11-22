@@ -16,7 +16,7 @@ A private notes repository filled by dictating to Claude in the Claude app. Clau
 - **Auth library:** django-oauth-toolkit (OAuth authorization server)
 - **Shared schemas:** Pydantic models in a `schemas` package, imported by both the Ninja API and the MCP tools
 - **Hosting:** old laptop, Ubuntu Server (headless), Docker Compose (`web`, `db`, `mcp`, `cloudflared`)
-- **Exposure:** Cloudflare Tunnel (no open ports on the home network)
+- **Exposure:** Cloudflare Tunnel at `https://myfilaments.dev` (no open ports on the home network). The tunnel reaches only an `edge` proxy (Caddy) whose allowlist in `edge/Caddyfile` passes `/mcp` and the sign-in/OAuth endpoints; everything else, including `/api/`, `/admin/` and `/o/introspect/`, is a 404. Setup: `docs/remote-access.md`
 
 ## Data Model
 ### Entities
@@ -100,7 +100,6 @@ REST with Django Ninja, all routes under `/api/`, no version prefix (single clie
 
 ## Deferred Decisions
 - Backup destination and restore test
-- Domain name for the Cloudflare Tunnel hostname
 
 ## References
 - `PRD.md` — Filaments v2

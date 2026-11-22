@@ -122,10 +122,19 @@ def test_missing_remote_addr_does_not_crash(anon_client, user):
     assert response.status_code == 200
 
 
-def test_direct_sign_in_lands_in_admin(anon_client, user):
+def test_direct_sign_in_lands_on_a_page_the_edge_allows(anon_client, user):
+    # The admin is never public, so landing there through the tunnel would be a 404.
     response = attempt(anon_client, PASSWORD)
 
-    assert response["Location"] == "/admin/"
+    assert response["Location"] == "/accounts/signed-in/"
+    assert "You're signed in" in anon_client.get("/accounts/signed-in/").text
+
+
+def test_signed_in_page_needs_a_session(anon_client):
+    response = anon_client.get("/accounts/signed-in/")
+
+    assert response.status_code == 302
+    assert response["Location"].startswith("/accounts/login/")
 
 
 def test_password_is_never_logged(anon_client, user, caplog):

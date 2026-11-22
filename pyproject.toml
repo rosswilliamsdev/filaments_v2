@@ -38,5 +38,5 @@ known-first-party = ["accounts", "api", "config", "filaments", "filaments_mcp", 
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings"
-pythonpath = ["backend"]
+pythonpath = ["backend", "backend/tests"]  # backend/tests: shared test helpers (oauth_helpers)
 testpaths = ["backend/tests", "mcp_server/tests", "schemas/tests"]

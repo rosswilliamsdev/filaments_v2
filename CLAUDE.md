@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## Project status
 
-Roadmap steps 1–8 are in place: Docker Compose scaffolding with `GET /api/health`, the `Filament`/`Tag` models, the shared `schemas` package, create/get/update/delete plus list/search under `/api/filaments`, and `/api/tags`, all behind a service bearer token, the stdio MCP server with six tools, and the OAuth authorization server (django-oauth-toolkit) with its login page. Remote MCP and the tunnel come in step 9 — check `roadmap.md` before assuming a module exists.
+Roadmap steps 1–9 are in place: Docker Compose scaffolding with `GET /api/health`, the `Filament`/`Tag` models, the shared `schemas` package, create/get/update/delete plus list/search under `/api/filaments`, and `/api/tags`, all behind a service bearer token, the stdio MCP server with six tools, the OAuth authorization server (django-oauth-toolkit) with its login page, and remote access: MCP over Streamable HTTP with OAuth introspection, a Caddy edge allowlist and a Cloudflare Tunnel at `https://myfilaments.dev` (setup: `docs/remote-access.md`). Backups and the soft-delete sweep come in step 10 — check `roadmap.md` before assuming a module exists.
 
 Source of truth, in priority order:
 1. `docs/PRD.md` — scope, goals, non-goals, phasing
@@ -23,7 +23,8 @@ pyproject.toml     # workspace root: dev deps, Ruff and pytest config
 backend/           # filaments-backend: Django project (config/), Ninja API (api/), models + write logic (filaments/services.py) + read/search logic (filaments/queries.py), OAuth clients + login lockout (accounts/), tests/
 schemas/           # filaments-schemas: shared Pydantic models, import name `schemas`. No Django imports.
 mcp_server/        # filaments-mcp: FastMCP server, import `filaments_mcp`. HTTP client to the API; no Django.
-compose.yaml       # web (gunicorn) + db (postgres:17); both bound to 127.0.0.1 only
+edge/Caddyfile     # the public allowlist: what the tunnel can reach (everything else 404)
+compose.yaml       # db + web by default; profile `remote` adds mcp + edge (127.0.0.1:8080); `public` adds cloudflared
 ```
 
 Never name a local package `mcp` — it shadows the MCP SDK.
@@ -36,6 +37,8 @@ Run from the repo root. Settings come from `.env` (copy `.env.example`; `DJANGO_
 uv sync                                          # install everything (workspace + dev tools)
 docker compose up -d --build                     # run web + db; API at http://127.0.0.1:8000/api/health
 docker compose up -d db                          # db only, for local dev and tests
+docker compose --profile remote up -d --build    # + mcp and edge: test the public surface at http://127.0.0.1:8080
+docker compose --profile public up -d --build    # + cloudflared: the laptop, online at https://myfilaments.dev
 uv run --env-file .env backend/manage.py runserver   # dev server with autoreload (needs db up)
 uv run --env-file .env backend/manage.py migrate
 uv run --env-file .env pytest                    # tests run against the Compose Postgres (needs db up)
@@ -53,6 +56,8 @@ If another Postgres already holds port 5432 on the host, set `POSTGRES_PORT` in 
 `FILAMENTS_TIMEZONE` (IANA name, e.g. `America/Chicago`; default `UTC`) sets Django's `TIME_ZONE`. Timestamps are stored in UTC; the home zone decides what a calendar day means for date filters. An unknown name stops startup.
 
 `FILAMENTS_API_TOKEN` (required, 32+ characters) is the bearer token for every API route except `/api/health`; generate it with `uv run python -c "import secrets; print(secrets.token_urlsafe(32))"`. `FILAMENTS_PUBLIC_URL` (default `http://127.0.0.1:8000`) is the OAuth issuer: the public base URL Claude signs in to (the tunnel URL in step 9). OAuth endpoints: `/.well-known/oauth-authorization-server`, `/o/{authorize,token,revoke_token,introspect}/`, login at `/accounts/login/`. OAuth tokens never work on `/api/`.
+
+**Remote access** (`docs/remote-access.md`): `python -m filaments_mcp --http` needs `FILAMENTS_PUBLIC_URL` (`https://`; plain http only with `FILAMENTS_ALLOW_INSECURE_PUBLIC_URL=true`, never on the laptop) and `FILAMENTS_INTROSPECTION_CLIENT_ID`/`_SECRET` (`FILAMENTS_INTROSPECTION_URL` defaults to `http://web:8000/o/introspect/`). Every MCP request is checked by introspection (scope `notes`, `aud` = `<public>/mcp`, no cache). `edge/Caddyfile` is the firewall: changing it changes what the internet can reach, so curl-test blocked paths (`/api/`, `/admin/`, `/o/introspect/` → 404) after any edit. The tunnel token is `CLOUDFLARE_TUNNEL_TOKEN`.
 
 `/api/docs` and `/api/openapi.json` exist only when `DJANGO_DEBUG` is on. Tests use a fixed token from `backend/tests/conftest.py`, whose `client` fixture sends it (`anon_client` doesn't).
 

@@ -4,7 +4,7 @@ A private notes repository you fill by talking to Claude.
 
 Dictate a thought to Claude in the Claude app. Claude cleans it up, writes a title, picks tags, and saves it through a self-hosted MCP server. Later, ask Claude to find past notes, or browse and edit them in a private web UI.
 
-> **Status:** Phase 1 in progress. Scaffolding is done (Django + Postgres in Docker Compose, `GET /api/health`); see [`roadmap.md`](roadmap.md) for what's next.
+> **Status:** Phase 1 in progress. Storage, search, the API, the MCP server, OAuth sign-in and remote access at `https://myfilaments.dev` are built (roadmap steps 1–9); backups come next. Putting it online: [`docs/remote-access.md`](docs/remote-access.md). See [`roadmap.md`](roadmap.md) for the plan.
 
 ## How it works
 

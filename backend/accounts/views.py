@@ -1,6 +1,8 @@
 import logging
 
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import LoginView
+from django.views.generic import TemplateView
 
 from accounts import throttle
 
@@ -41,3 +43,9 @@ class ThrottledLoginView(LoginView):
             self.attempts,
         )
         return super().form_invalid(form)
+
+
+class SignedInView(LoginRequiredMixin, TemplateView):
+    """Where a direct sign-in lands (Claude's sign-ins return to Claude instead)."""
+
+    template_name = "registration/signed_in.html"

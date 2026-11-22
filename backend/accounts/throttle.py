@@ -7,6 +7,7 @@ attempt restarts the 5 minutes. A successful sign-in clears the address.
 """
 
 import datetime as dt
+import ipaddress
 
 from django.db import transaction
 from django.utils import timezone
@@ -19,10 +20,25 @@ LOCKED_MESSAGE = "Too many failed sign-ins. Try again in a few minutes."
 UNKNOWN_IP = "0.0.0.0"  # REMOTE_ADDR can be empty (e.g. a unix socket); share one bucket
 
 
+def _valid_ip(value: str | None) -> str | None:
+    try:
+        return str(ipaddress.ip_address((value or "").strip()))
+    except ValueError:
+        return None
+
+
 def client_ip(request) -> str:
-    # Behind the Cloudflare tunnel (step 9) every request comes from cloudflared;
-    # the visitor's address will come from CF-Connecting-IP, trusted only from the tunnel.
-    return request.META.get("REMOTE_ADDR") or UNKNOWN_IP
+    """The visitor's address.
+
+    Through the tunnel every request reaches Django from the edge proxy, so the real
+    visitor is in CF-Connecting-IP. Trusting it is safe: Cloudflare overwrites it on all
+    public traffic, and the only other way to reach Django is 127.0.0.1 on the laptop.
+    """
+    return (
+        _valid_ip(request.META.get("HTTP_CF_CONNECTING_IP"))
+        or _valid_ip(request.META.get("REMOTE_ADDR"))
+        or UNKNOWN_IP
+    )
 
 
 def reserve_attempt(ip: str) -> int | None:

@@ -1,0 +1,32 @@
+# The only thing the Cloudflare tunnel reaches. An allowlist: Claude's MCP endpoint and
+# the sign-in pages get through; everything else, including /api/, /admin/ and
+# /o/introspect/, is answered here with 404 and never reaches a backend.
+# Changing this file changes what the internet can touch: keep it small and test it
+# (see CLAUDE.md, "Remote access").
+{
+	auto_https off # Cloudflare terminates TLS; this hop is plain http inside Docker
+	admin off
+	servers {
+		# Keep X-Forwarded-Proto: https (and CF-Connecting-IP) from cloudflared, which
+		# reaches us from a private Docker address.
+		trusted_proxies static private_ranges
+	}
+}
+
+:80 {
+	# MCP over Streamable HTTP, and its RFC 9728 protected-resource metadata.
+	@mcp path /mcp /mcp/ /.well-known/oauth-protected-resource /.well-known/oauth-protected-resource/*
+	handle @mcp {
+		reverse_proxy mcp:8000
+	}
+
+	# OAuth discovery, sign-in and token exchange. Not /o/introspect/ (internal only).
+	@oauth path /.well-known/oauth-authorization-server /o/authorize/ /o/token/ /o/revoke_token/ /accounts/login/ /accounts/logout/ /accounts/signed-in/
+	handle @oauth {
+		reverse_proxy web:8000
+	}
+
+	handle {
+		respond 404
+	}
+}

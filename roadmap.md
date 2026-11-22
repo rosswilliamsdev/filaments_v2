@@ -120,8 +120,8 @@ Steps 8 and 10 don't depend on the API chain, so they can be done earlier or alo
 **Goal:** The MCP server reachable from claude.ai, protected by OAuth.
 - Streamable HTTP transport alongside the stdio entry point, run as the `mcp` service in Docker Compose (API at `http://web:8000/api`)
 - MCP server checks the OAuth token on every request
-- `cloudflared` service in Docker Compose; only the MCP and OAuth endpoints are routed, never `/api/`
-- **Deferred decision to settle here:** the domain for the tunnel hostname
+- `cloudflared` service in Docker Compose (profile `public`); a Caddy `edge` allowlist routes only the MCP and OAuth endpoints, never `/api/`
+- ~~Deferred decision~~ settled: the domain is **`myfilaments.dev`** (setup steps in `docs/remote-access.md`)
 
 **Done when:** The connector is added in claude.ai on desktop, and a request without a token is rejected.
 

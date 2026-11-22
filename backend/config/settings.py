@@ -7,6 +7,7 @@ deployment.
 
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.core.exceptions import ImproperlyConfigured
@@ -50,11 +51,29 @@ def env_timezone(key: str, default: str = "UTC") -> str:
     return name
 
 
+def public_url_settings(public_url: str) -> dict:
+    """What Django needs to serve `public_url` from behind Cloudflare and the edge proxy."""
+    parts = urlsplit(public_url)
+    secure = parts.scheme == "https"
+    return {
+        "host": parts.hostname,
+        "origin": f"{parts.scheme}://{parts.netloc}",
+        # Cloudflare -> cloudflared -> edge -> web: the last hop is plain http, so trust
+        # the forwarded scheme, but only when the site really is served over https.
+        "SECURE_PROXY_SSL_HEADER": ("HTTP_X_FORWARDED_PROTO", "https") if secure else None,
+        "SESSION_COOKIE_SECURE": secure,
+        "CSRF_COOKIE_SECURE": secure,
+    }
+
+
 def env_url(key: str, default: str) -> str:
     """An absolute http(s) URL without a trailing slash."""
     url = (os.environ.get(key, "").strip() or default).rstrip("/")
     if not url.startswith(("http://", "https://")):
         raise ImproperlyConfigured(f"{key} must start with http:// or https://")
+    if urlsplit(url).path:
+        # The edge, CSRF origins and the OAuth issuer all assume the site root.
+        raise ImproperlyConfigured(f"{key} must be a bare origin, without a path")
     return url
 
 
@@ -63,6 +82,10 @@ SECRET_KEY = env_required("DJANGO_SECRET_KEY")
 FILAMENTS_API_TOKEN = env_token("FILAMENTS_API_TOKEN")
 DEBUG = env_bool("DJANGO_DEBUG")
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
+# The Docker service name: the mcp container calls the API and introspection at
+# http://web:8000. Only containers on the Compose network can use this name.
+if "web" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append("web")
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 
 INSTALLED_APPS = [
@@ -142,10 +165,20 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Local default; the tunnel URL in step 9.
 FILAMENTS_PUBLIC_URL = env_url("FILAMENTS_PUBLIC_URL", "http://127.0.0.1:8000")
 
+# Serve the public URL from behind the tunnel and the edge proxy.
+_public = public_url_settings(FILAMENTS_PUBLIC_URL)
+if _public["host"] not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_public["host"])
+if _public["origin"] not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(_public["origin"])  # the login form is a POST
+SECURE_PROXY_SSL_HEADER = _public["SECURE_PROXY_SSL_HEADER"]
+SESSION_COOKIE_SECURE = _public["SESSION_COOKIE_SECURE"]
+CSRF_COOKIE_SECURE = _public["CSRF_COOKIE_SECURE"]
+
 LOGIN_URL = "/accounts/login/"
-# OAuth sign-ins return to Claude via `next`; a direct sign-in lands in the admin until
-# the Phase 2 web UI exists.
-LOGIN_REDIRECT_URL = "/admin/"
+# OAuth sign-ins return to Claude via `next`. A direct sign-in lands on a small
+# confirmation page, which the edge allows (the admin is never public).
+LOGIN_REDIRECT_URL = "/accounts/signed-in/"
 
 OAUTH2_PROVIDER = {
     "SCOPES": {

@@ -12,11 +12,13 @@ from typing import Annotated, Any
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.server.auth import RemoteAuthProvider
+from fastmcp.server.auth.providers.introspection import IntrospectionTokenVerifier
 from pydantic import BaseModel, Field, ValidationError
 
 from filaments_mcp import formatting
 from filaments_mcp.api_client import NOT_FOUND, ApiClient
-from filaments_mcp.config import Config
+from filaments_mcp.config import Config, HttpConfig
 from schemas import MAX_TAGS, FilamentCreate, FilamentListParams, FilamentUpdate
 
 INSTRUCTIONS = f"""\
@@ -71,12 +73,63 @@ def _note_path(note_id: str) -> str:
         raise ToolError(NOT_FOUND) from None
 
 
-def create_server(config: Config, transport: httpx.AsyncBaseTransport | None = None) -> FastMCP:
-    """Build the server. `transport` lets tests replace the HTTP API with a fake."""
+def oauth_provider(
+    http: HttpConfig, introspection_client: httpx.AsyncClient | None = None
+) -> RemoteAuthProvider:
+    """OAuth for --http: every request's token is checked by Django's introspection.
+
+    No caching, so a revoked token stops working on the very next request. The token
+    must carry scope `notes` and be bound (`aud`) to this server's public /mcp URL.
+    """
+    verifier = IntrospectionTokenVerifier(
+        introspection_url=http.introspection_url,
+        client_id=http.client_id,
+        client_secret=http.client_secret,  # sent as HTTP Basic
+        required_scopes=["notes"],
+        audience=http.resource_url,
+        http_client=introspection_client,  # tests inject a fake introspection endpoint
+    )
+    return RemoteAuthProvider(
+        token_verifier=verifier,
+        authorization_servers=[http.public_url],  # Django: /.well-known/oauth-authorization-server
+        base_url=http.public_url,
+        resource_name="Filaments",
+    )
+
+
+def allowed_hosts(http: HttpConfig) -> list[str]:
+    """Host headers the HTTP server accepts (FastMCP's DNS-rebinding guard)."""
+    hosts = [http.public_host, "mcp"]  # the public name, and the Docker service name
+    return hosts + [f"{host}:*" for host in hosts if ":" not in host]
+
+
+# Origins a browser-side Claude client could send. Behind the edge uvicorn sees plain
+# http, so FastMCP's same-origin fallback would reject even our own https origin.
+CLAUDE_ORIGINS = ["https://claude.ai", "https://claude.com"]
+
+
+def http_options(http: HttpConfig) -> dict:
+    """Options for FastMCP's HTTP app, shared by `--http` and the tests."""
+    return {
+        "path": "/mcp",
+        "allowed_hosts": allowed_hosts(http),
+        "allowed_origins": [http.public_origin, *CLAUDE_ORIGINS],
+        # Off by default in FastMCP 4: allowed_hosts alone does nothing.
+        "host_origin_protection": True,
+    }
+
+
+def create_server(
+    config: Config,
+    transport: httpx.AsyncBaseTransport | None = None,
+    auth: RemoteAuthProvider | None = None,
+) -> FastMCP:
+    """Build the server. `transport` lets tests replace the HTTP API with a fake; `auth`
+    is set for --http and left out for stdio (local only)."""
     api = ApiClient(config, transport)
     # mask_error_details: an unexpected exception reaches Claude as a generic failure;
     # ToolError messages (ours) still pass through unchanged.
-    mcp = FastMCP("filaments", instructions=INSTRUCTIONS, mask_error_details=True)
+    mcp = FastMCP("filaments", instructions=INSTRUCTIONS, mask_error_details=True, auth=auth)
 
     @mcp.tool(output_schema=None, annotations=CREATES)
     async def create_filament(

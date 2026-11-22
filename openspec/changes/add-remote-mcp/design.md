@@ -40,7 +40,8 @@ After steps 7 and 8: the MCP server runs over stdio only (no auth); Django is th
 ```python
 verifier = IntrospectionTokenVerifier(
     introspection_url=config.introspection_url,
-    client_id=..., client_secret=...,          # HTTP Basic
+    client_id=...,
+    client_secret=...,  # HTTP Basic
     required_scopes=["notes"],
     audience=f"{public_url}/mcp",
     # no cache_ttl_seconds: every request is checked, revocation is immediate
@@ -72,7 +73,24 @@ In `settings.py`, derived from `FILAMENTS_PUBLIC_URL`:
 
 - `mcp`: built from new `mcp_server/Dockerfile` (same uv pattern as `backend/Dockerfile`, `--package filaments-mcp`), `command: python -m filaments_mcp --http`, `FILAMENTS_API_URL=http://web:8000/api`, no published port, healthcheck on the protected-resource metadata, `depends_on: web`.
 - `edge`: `caddy:2.11.9`, mounts `edge/Caddyfile`, `ports: 127.0.0.1:8080:80`, `depends_on: web, mcp`.
-- `cloudflared`: `cloudflare/cloudflared:2026.10.7`, `command: tunnel --no-autoupdate run`, `TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}`, `profiles: [public]`, `depends_on: edge`.
+- `cloudflared`: `cloudflare/cloudflared:2026.10.7`, `command: tunnel --no-autoupdate run`, `TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}`, `profiles: [public]`, `depends_on: edge`. (`mcp` and `edge` are in profiles `remote` and `public`; see "Found during implementation".)
+
+### Found during implementation
+
+- **Profiles:** `mcp` and `edge` need introspection credentials, so a plain `docker compose up` on the Mac would crash-loop `mcp`. They are in profiles `remote` (mcp + edge, for local testing) and `public` (mcp + edge + cloudflared, the laptop); a plain `up` stays db + web.
+- **FastMCP's host guard is off by default.** `allowed_hosts` alone does nothing; `host_origin_protection=True` is set in a shared `http_options()` used by both `--http` and the tests. The guard also trusts the ASGI `server` address, which httpx's test transport sets to the request host, so the host test drives the app with a hand-built ASGI scope bound to `0.0.0.0`, as uvicorn is in the container.
+- **Django must accept `Host: web`.** The mcp container calls `http://web:8000` for introspection and the API; without `web` in `ALLOWED_HOSTS` Django answered 400 and every token check failed. Found only by the Compose test (unit and live_server tests use `localhost`); Django now always adds `web`.
+- **`CF-Connecting-IP` is validated** as an IP address before use; anything else falls back to the connection address.
+
+### Code review (task 4.3)
+
+- **Origin guard rejected https origins.** Behind the edge, uvicorn sees plain http, so FastMCP's same-origin fallback refused any `Origin` header, even `https://myfilaments.dev`; if Claude sends one, every call would fail. `allowed_origins` now lists the public origin, `https://claude.ai` and `https://claude.com` (reproduced and tested; `https://evil.example` still 403).
+- **`SECURE_PROXY_SSL_HEADER` only for https sites**, so a forwarded "https" can't fool a plain-http dev server.
+- **Direct sign-in landed on a 404** through the tunnel (redirect to `/admin/`, which the edge blocks). It now lands on `/accounts/signed-in/`, allowed by the edge.
+- **`/mcp/`** is allowed through the edge (FastMCP answers with a redirect to `/mcp`).
+- **A public URL with a path** is rejected by both Django and `--http`: the edge, CSRF origins and the issuer all assume the site root.
+- `.env.example`: `FILAMENTS_INTROSPECTION_URL` added; the stale CSRF comment fixed.
+- **Not changed, raised with you:** the lockout is per visitor address now that `CF-Connecting-IP` is used, so guessing spread across many addresses isn't capped. That is the per-IP trade-off decided in step 8 (a global lockout would let anyone lock out the only user).
 
 ### Verification before going public
 

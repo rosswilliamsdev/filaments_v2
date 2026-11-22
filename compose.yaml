@@ -42,5 +42,57 @@ services:
       retries: 3
     restart: unless-stopped
 
+  # --- Remote access (step 9) ----------------------------------------------------
+  # Profiles: plain `docker compose up` stays db + web. `--profile remote` adds mcp and
+  # edge for local testing (edge on 127.0.0.1:8080); `--profile public` adds the tunnel
+  # too (the laptop).
+
+  mcp:
+    profiles: [remote, public]
+    build:
+      context: .
+      dockerfile: mcp_server/Dockerfile
+    env_file: .env
+    environment:
+      FILAMENTS_API_URL: http://web:8000/api
+      FILAMENTS_INTROSPECTION_URL: http://web:8000/o/introspect/
+    depends_on:
+      web:
+        condition: service_healthy
+    # No published port: only edge reaches it.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen(u.Request('http://localhost:8000/.well-known/oauth-protected-resource/mcp', headers={'Host': 'mcp'}))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  edge:
+    profiles: [remote, public]
+    image: caddy:2.11.9
+    volumes:
+      - ./edge/Caddyfile:/etc/caddy/Caddyfile:ro
+    ports:
+      # Localhost only, for testing the allowlist with curl. The tunnel reaches edge
+      # over the Docker network.
+      - "127.0.0.1:8080:80"
+    depends_on:
+      web:
+        condition: service_healthy
+      mcp:
+        condition: service_healthy
+    restart: unless-stopped
+
+  cloudflared:
+    profiles: [public]
+    image: cloudflare/cloudflared:2026.10.7
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      # From .env. The tunnel's one public hostname points at http://edge:80.
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - edge
+    restart: unless-stopped
+
 volumes:
   pgdata:

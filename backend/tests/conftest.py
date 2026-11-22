@@ -33,3 +33,11 @@ def client(api_token):
 def anon_client():
     """Django test client with no Authorization header."""
     return Client()
+
+
+@pytest.fixture
+def oauth_clients(db) -> dict[str, tuple[str, str]]:
+    """Your account plus the Claude and MCP-introspection OAuth clients, with secrets."""
+    from oauth_helpers import setup_clients
+
+    return setup_clients()
