@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## Project status
 
-Roadmap steps 1–4 are in place: Docker Compose scaffolding with `GET /api/health`, the `Filament`/`Tag` models, the shared `schemas` package, and create/get/update/delete under `/api/filaments`. List/search, API auth, the MCP server and OAuth come in later steps — check `roadmap.md` before assuming a module exists.
+Roadmap steps 1–5 are in place: Docker Compose scaffolding with `GET /api/health`, the `Filament`/`Tag` models, the shared `schemas` package, create/get/update/delete plus list/search under `/api/filaments`, and `/api/tags`. API auth, the MCP server and OAuth come in later steps — check `roadmap.md` before assuming a module exists.
 
 Source of truth, in priority order:
 1. `docs/PRD.md` — scope, goals, non-goals, phasing
@@ -20,7 +20,7 @@ A uv workspace with one lockfile (`uv.lock`). Python 3.13.
 
 ```
 pyproject.toml     # workspace root: dev deps, Ruff and pytest config
-backend/           # filaments-backend: Django project (config/), Ninja API (api/), models + write logic (filaments/services.py), tests/
+backend/           # filaments-backend: Django project (config/), Ninja API (api/), models + write logic (filaments/services.py) + read/search logic (filaments/queries.py), tests/
 schemas/           # filaments-schemas: shared Pydantic models, import name `schemas`. No Django imports.
 compose.yaml       # web (gunicorn) + db (postgres:17); both bound to 127.0.0.1 only
 ```
@@ -79,7 +79,7 @@ Do **not** add: embeddings/pgvector, auto-linking between notes, server-side LLM
 - **Filament:** UUID id, `title`, `body` (Markdown), `tags` (M2M), `source` (`"claude"` | `"web"`), `search_vector`, `created_at`, `updated_at`, `deleted_at`.
 - **Tag:** unique `name`, lowercase, hyphenated. Normalize server-side on every write: trim → strip accents (Latin letters only) → lowercase → each run of non-letters/digits (spaces, punctuation, `_`) to one `-` → trim `-` → dedupe → get-or-create. Empty or >50-character tags are rejected, not fixed. Max 8 tags per filament, counted after dedupe. Rules live in `schemas/tags.py`.
 - **Soft delete:** default manager excludes `deleted_at IS NOT NULL`. A management command (nightly cron) hard-deletes rows soft-deleted >30 days ago.
-- **Search:** `search_vector` weights title A, body B, GIN index. Order by rank when `q` is present, else `created_at` desc. `tags` filter means *all* must match.
+- **Search:** `search_vector` weights title A, body B, GIN index. Keyword search (`q`, websearch syntax) appends tag names to that vector at query time (`filaments/queries.py`), so it does not use the GIN index. Order by rank when `q` is present, else `created_at` desc. `tags` filter means *all* must match.
 - Filament + tag writes happen in a single transaction.
 
 ## Architecture conventions

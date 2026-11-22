@@ -14,6 +14,8 @@ from pydantic import (
     ConfigDict,
     Field,
     StringConstraints,
+    ValidationInfo,
+    field_validator,
     model_validator,
 )
 from pydantic_core import PydanticCustomError
@@ -167,12 +169,15 @@ class FilamentListParams(BaseModel):
     limit: Annotated[int, Field(ge=1, le=100, description="How many to return, 1-100.")] = 20
     offset: Annotated[int, Field(ge=0, description="How many to skip.")] = 0
 
-    @model_validator(mode="after")
-    def _dates_in_order(self) -> "FilamentListParams":
-        if self.date_from and self.date_to and self.date_from > self.date_to:
+    # A field validator (not a model validator) so the 422 is located on `date_to`.
+    @field_validator("date_to")
+    @classmethod
+    def _dates_in_order(cls, date_to: dt.date | None, info: ValidationInfo) -> dt.date | None:
+        date_from = info.data.get("date_from")
+        if date_from and date_to and date_from > date_to:
             raise PydanticCustomError(
                 "date_order",
                 "Start date {date_from} is after end date {date_to}",
-                {"date_from": str(self.date_from), "date_to": str(self.date_to)},
+                {"date_from": str(date_from), "date_to": str(date_to)},
             )
-        return self
+        return date_to

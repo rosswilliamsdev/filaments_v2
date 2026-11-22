@@ -1,5 +1,6 @@
 """/api/filaments create/get/update/delete: see the openspec filament-api spec."""
 
+import datetime as dt
 import json
 import logging
 
@@ -203,3 +204,18 @@ def test_unexpected_error_returns_generic_json_500(client, monkeypatch, caplog):
     assert "secret internal detail" not in response.text
     assert "secret internal detail" in caplog.text
     assert "Traceback" in caplog.text
+
+
+# --- Timestamps -----------------------------------------------------------------
+
+
+def test_timestamps_returned_in_home_timezone(client, filament, settings):
+    settings.TIME_ZONE = "America/Chicago"
+    stored = dt.datetime(2026, 11, 22, 17, 53, 10, tzinfo=dt.UTC)
+    Filament.objects.filter(pk=filament["id"]).update(created_at=stored)
+
+    created_at = client.get(f"{URL}/{filament['id']}").json()["created_at"]
+
+    assert created_at.startswith("2026-11-22T11:53:10")
+    assert created_at.endswith("-06:00")
+    assert dt.datetime.fromisoformat(created_at) == stored

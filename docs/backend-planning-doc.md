@@ -83,7 +83,7 @@ REST with Django Ninja, all routes under `/api/`, no version prefix (single clie
 - **Load:** one user, low volume.
 - **Caching:** none.
 - **Files and uploads:** none in scope (attachments are an open question in the PRD).
-- **Search:** Postgres full-text search on `search_vector` (title weighted above body, `english` config), filtered by tags and date range, ordered by rank when `q` is present and by `created_at` otherwise. Keyword search (`q`) also matches tag names, so a note tagged `music` is found by "music" even if its text never says it. Queries must use the same `english` config as the column.
+- **Search:** Postgres full-text search on `search_vector` (title weighted above body, `english` config), filtered by tags and date range, ordered by rank when `q` is present and by `created_at` otherwise. Keyword search (`q`) also matches tag names, so a note tagged `music` is found by "music" even if its text never says it. `q` is parsed with `websearch_to_tsquery('english', …)`: words are ANDed, and `"quoted phrases"`, `-exclusions` and `or` work. Tag names are appended to the stored vector at query time (weight A), so a query can match words split across tags and text; this skips the GIN index, which is fine at personal scale. Date filters are whole days in the home timezone (`FILAMENTS_TIMEZONE`), and API timestamps are returned in that timezone with their offset. Queries must use the same `english` config as the column.
 
 ## Config & Environment
 - **Secrets:** a `.env` file on the laptop, read by Django and the MCP server, excluded from Git. A committed `.env.example` lists the required keys.

@@ -76,7 +76,8 @@ A helper in `api/filaments.py`, `to_out(filament) -> FilamentOut`, validates the
 
 ## Risks / Trade-offs
 
-- [`q` scans every live filament instead of using the GIN index] → Fine for hundreds to low thousands of rows (milliseconds). If it ever matters, move tag names into a stored column feeding the generated vector.
+- [`q` scans every live filament instead of using the GIN index, and Django inlines the tag-name subquery in the filter, the rank and the count, so it runs about three times per row] → Fine for hundreds to low thousands of rows (milliseconds). If it ever matters, move tag names into a stored column feeding the generated vector.
+- [Phrase queries matching across the body/tag join or between tags, because `||` places positions back to back] → Tag text is padded with stop words, which are dropped but still take positions; tested.
 - [AND semantics return nothing for over-specific queries] → Claude can retry with fewer words or use `or`; step 7's tool description will say so.
 - [Stop-word-only `q` silently matches nothing] → Correct by definition; returns an empty list rather than an error.
 - [Ninja query-list parsing] → Verified by the first test; fallback is reading `request.GET.getlist("tags")` explicitly.
