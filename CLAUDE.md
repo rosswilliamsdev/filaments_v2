@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## Project status
 
-Roadmap step 1 (scaffolding) is in place: a Django project with `GET /api/health`, running in Docker Compose. Models, the real API, the MCP server and OAuth come in later steps — check `roadmap.md` before assuming a module exists.
+Roadmap steps 1–4 are in place: Docker Compose scaffolding with `GET /api/health`, the `Filament`/`Tag` models, the shared `schemas` package, and create/get/update/delete under `/api/filaments`. List/search, API auth, the MCP server and OAuth come in later steps — check `roadmap.md` before assuming a module exists.
 
 Source of truth, in priority order:
 1. `docs/PRD.md` — scope, goals, non-goals, phasing
@@ -20,7 +20,7 @@ A uv workspace with one lockfile (`uv.lock`). Python 3.13.
 
 ```
 pyproject.toml     # workspace root: dev deps, Ruff and pytest config
-backend/           # filaments-backend: Django project (config/), Ninja API (api/), tests/
+backend/           # filaments-backend: Django project (config/), Ninja API (api/), models + write logic (filaments/services.py), tests/
 schemas/           # filaments-schemas: shared Pydantic models, import name `schemas`. No Django imports.
 compose.yaml       # web (gunicorn) + db (postgres:17); both bound to 127.0.0.1 only
 ```

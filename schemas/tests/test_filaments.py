@@ -124,8 +124,12 @@ def test_update_normalizes_and_limits_tags():
         FilamentUpdate(tags=[f"tag-{i}" for i in range(9)])
 
 
-def test_empty_update_has_no_changes():
-    assert FilamentUpdate().changes() == {}
+def test_empty_update_rejected():
+    with pytest.raises(ValidationError) as exc:
+        FilamentUpdate()
+
+    _, message = error_for(exc)
+    assert message == "Send at least one of title, body or tags"
 
 
 @pytest.mark.parametrize("field", ["title", "body", "tags"])

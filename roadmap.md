@@ -86,7 +86,7 @@ Steps 8 and 10 don't depend on the API chain, so they can be done earlier or alo
 - `GET /api/filaments` with `q`, `tags` (all must match), `date_from`, `date_to`, `limit`, `offset`
 - Ordered by rank when `q` is set, otherwise newest first
 - `q` matches the search vector **or** tag names (agreed in step 2; tags aren't in the generated vector), using the `english` config
-- `GET /api/tags` with usage counts (excluding soft-deleted filaments)
+- `GET /api/tags` with usage counts (excluding soft-deleted filaments); tags with no remaining filaments are kept in the table but hidden here
 
 **Done when:** Tests cover each filter alone and combined, ranking order, and paging.
 

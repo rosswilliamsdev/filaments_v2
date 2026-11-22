@@ -99,6 +99,12 @@ class FilamentUpdate(BaseModel):
     body: Body = None  # type: ignore[assignment]
     tags: WriteTags = None  # type: ignore[assignment]
 
+    @model_validator(mode="after")
+    def _something_sent(self) -> "FilamentUpdate":
+        if not self.model_fields_set:
+            raise PydanticCustomError("empty_update", "Send at least one of title, body or tags")
+        return self
+
     def changes(self) -> dict[str, Any]:
         """Only the fields the caller actually sent."""
         return self.model_dump(include=self.model_fields_set)
