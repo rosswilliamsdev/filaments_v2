@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## Project status
 
-Roadmap steps 1–5 are in place: Docker Compose scaffolding with `GET /api/health`, the `Filament`/`Tag` models, the shared `schemas` package, create/get/update/delete plus list/search under `/api/filaments`, and `/api/tags`. API auth, the MCP server and OAuth come in later steps — check `roadmap.md` before assuming a module exists.
+Roadmap steps 1–6 are in place: Docker Compose scaffolding with `GET /api/health`, the `Filament`/`Tag` models, the shared `schemas` package, create/get/update/delete plus list/search under `/api/filaments`, and `/api/tags`, all behind a service bearer token. The MCP server and OAuth come in later steps — check `roadmap.md` before assuming a module exists.
 
 Source of truth, in priority order:
 1. `docs/PRD.md` — scope, goals, non-goals, phasing
@@ -46,6 +46,8 @@ Logs: console always; in Compose also `logs/django.log` (gitignored).
 If another Postgres already holds port 5432 on the host, set `POSTGRES_PORT` in `.env` to a free port (e.g. 5433); Compose publishes the db on that port and `web` still uses 5432 internally.
 
 `FILAMENTS_TIMEZONE` (IANA name, e.g. `America/Chicago`; default `UTC`) sets Django's `TIME_ZONE`. Timestamps are stored in UTC; the home zone decides what a calendar day means for date filters. An unknown name stops startup.
+
+`FILAMENTS_API_TOKEN` (required, 32+ characters) is the bearer token for every API route except `/api/health`; generate it with `uv run python -c "import secrets; print(secrets.token_urlsafe(32))"`. Tests use a fixed token from `backend/tests/conftest.py`, whose `client` fixture sends it (`anon_client` doesn't).
 
 `pytest` runs `backend/tests` (needs the db) and `schemas/tests` (no database).
 

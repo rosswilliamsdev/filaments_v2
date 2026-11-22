@@ -67,7 +67,7 @@ REST with Django Ninja, all routes under `/api/`, no version prefix (single clie
 
 ## Auth & Authorization
 - **Claude → MCP server:** OAuth, with django-oauth-toolkit as the authorization server. The MCP server validates the access token on every request. Signing in during the connector setup uses Ross's Django account.
-- **MCP server → API:** a service bearer token from `.env`, checked by a small custom Ninja auth class. The API listens on the Docker network and localhost only; it is never exposed through the tunnel.
+- **MCP server → API:** a service bearer token (`FILAMENTS_API_TOKEN` in `.env`, at least 32 characters), checked by a small custom Ninja auth class applied to the whole API; only `/api/health` opts out. The MCP server is the token's only holder: the web UI calls the service and query modules in-process. The API listens on the Docker network and localhost only; it is never exposed through the tunnel.
 - **Web UI (Phase 2):** Django session login.
 - **Roles, permissions, multi-tenancy:** none — single user.
 - **Public routes:** `/api/health` and the OAuth endpoints only.

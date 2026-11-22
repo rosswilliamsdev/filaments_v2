@@ -91,7 +91,7 @@ Steps 8 and 10 don't depend on the API chain, so they can be done earlier or alo
 **Done when:** Tests cover each filter alone and combined, ranking order, and paging.
 
 ### 6. Service-token auth on the API
-**Goal:** Only the MCP server (and later the web UI) can call the API.
+**Goal:** Only the MCP server can call the API. (The Phase 2 web UI calls `filaments/services.py` and `queries.py` in-process with session login, so it never needs the token.)
 - A custom Ninja auth class that checks a bearer token from `.env`
 - Every route except `/api/health` requires it
 

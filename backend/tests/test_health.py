@@ -15,8 +15,8 @@ def test_health_ok(client):
     assert response.json() == {"status": "ok"}
 
 
-def test_health_needs_no_credentials(client):
-    response = client.get("/api/health", headers={})
+def test_health_needs_no_credentials(anon_client):
+    response = anon_client.get("/api/health")
 
     assert "HTTP_AUTHORIZATION" not in response.wsgi_request.META
     assert response.status_code == 200

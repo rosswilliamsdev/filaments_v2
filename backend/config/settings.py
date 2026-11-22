@@ -32,6 +32,14 @@ def env_list(key: str, default: str = "") -> list[str]:
     return [item.strip() for item in os.environ.get(key, default).split(",") if item.strip()]
 
 
+def env_token(key: str, min_length: int = 32) -> str:
+    """A required secret token. Errors name the key but never echo the value."""
+    value = env_required(key)
+    if len(value) < min_length:
+        raise ImproperlyConfigured(f"{key} must be at least {min_length} characters")
+    return value
+
+
 def env_timezone(key: str, default: str = "UTC") -> str:
     """An IANA timezone name, checked at startup so a typo fails loudly."""
     name = os.environ.get(key, "").strip() or default
@@ -43,6 +51,8 @@ def env_timezone(key: str, default: str = "UTC") -> str:
 
 
 SECRET_KEY = env_required("DJANGO_SECRET_KEY")
+# Bearer token the MCP server sends to the API (its only caller). See api/auth.py.
+FILAMENTS_API_TOKEN = env_token("FILAMENTS_API_TOKEN")
 DEBUG = env_bool("DJANGO_DEBUG")
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
