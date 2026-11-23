@@ -1,7 +1,7 @@
 # mcp-tools Specification
 
 ## Purpose
-The MCP server Claude talks to: six tools mapped one-to-one onto the API, input validated with the shared schemas, replies and errors short enough to be read aloud, and a stdio entry point for local use. Remote access (Streamable HTTP, OAuth, the tunnel) comes in later steps.
+The MCP server Claude talks to: six tools mapped one-to-one onto the API, input validated with the shared schemas, replies and errors short enough to be read aloud, and a stdio entry point for local use. The same tools are served over Streamable HTTP at `/mcp` for claude.ai, with every request checked by OAuth introspection.
 ## Requirements
 ### Requirement: Six tools map one-to-one onto API routes
 The MCP server SHALL expose exactly these tools, each calling one API route with the service token: `create_filament` (POST `/api/filaments`), `search_filaments` (GET `/api/filaments`), `get_filament` (GET `/api/filaments/{id}`), `update_filament` (PATCH `/api/filaments/{id}`), `delete_filament` (DELETE `/api/filaments/{id}`) and `list_tags` (GET `/api/tags`). The server SHALL NOT access the database or import Django.
@@ -116,3 +116,29 @@ Tool failures SHALL be raised as tool errors with plain-language messages and no
 - **WHEN** the server starts without `FILAMENTS_API_TOKEN`
 - **THEN** it exits with a non-zero status and an error naming `FILAMENTS_API_TOKEN` on stderr
 
+### Requirement: HTTP transport requires OAuth on every request
+`python -m filaments_mcp --http` SHALL serve the same six tools over Streamable HTTP at `/mcp`. Every request SHALL carry a bearer token that Django's introspection endpoint reports as active, with scope `notes` and `aud` containing `<FILAMENTS_PUBLIC_URL>/mcp`; tokens SHALL be checked on every request, without caching. The server SHALL publish RFC 9728 protected-resource metadata naming `FILAMENTS_PUBLIC_URL` as the authorization server, and SHALL answer a missing or invalid token with `401` and a `WWW-Authenticate` header pointing to that metadata. HTTP mode SHALL refuse to start unless `FILAMENTS_PUBLIC_URL` is `https` and the introspection client ID and secret are set. It SHALL accept requests only for the public host (or the Docker service name), and requests carrying an `Origin` header only from the public origin, `https://claude.ai` or `https://claude.com`.
+
+#### Scenario: No token
+- **WHEN** a client calls `/mcp` without a token
+- **THEN** the response is 401 with `WWW-Authenticate` naming the protected-resource metadata URL
+
+#### Scenario: Discovery
+- **WHEN** a client requests the protected-resource metadata
+- **THEN** it lists `https://myfilaments.dev` as the authorization server and the resource as `https://myfilaments.dev/mcp`
+
+#### Scenario: Valid token
+- **WHEN** Claude calls `create_filament` with an active token, scope `notes` and the right audience
+- **THEN** the note is saved and the speakable reply comes back
+
+#### Scenario: Token for another resource
+- **WHEN** a token is active but its `aud` is a different URL
+- **THEN** the request is refused with 401
+
+#### Scenario: Revoked token
+- **WHEN** a token is revoked in Django and used again
+- **THEN** the very next request is refused with 401
+
+#### Scenario: Misconfigured HTTP mode
+- **WHEN** `--http` starts without the introspection credentials or with an `http://` public URL
+- **THEN** it exits with an error naming the missing or invalid setting
